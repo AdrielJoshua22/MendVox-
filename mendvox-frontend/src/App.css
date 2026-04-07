@@ -1,0 +1,247 @@
+:root {
+  --bg-color: #f9fafb;
+  --card-bg: #ffffff;
+  --text-main: #1f2937;
+  --text-sub: #6b7280;
+  --accent: #3b82f6;
+  --border: #e5e7eb;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.container {
+  width: 100%;
+  max-width: 600px;
+  padding: 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  padding: 40px;
+  border-radius: 24px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border);
+}
+
+.logo {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -1px;
+  color: var(--text-main);
+}
+
+.subtitle {
+  color: var(--text-sub);
+  margin-top: 8px;
+  font-size: 1.1rem;
+}
+
+.input-section {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-size: 1rem;
+  resize: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+}
+
+.mend-button {
+  margin-top: 16px;
+  padding: 14px;
+  background-color: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mend-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.mend-button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 32px 0;
+}
+
+.result-text {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: var(--text-main);
+  background: #eff6ff;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.timer-badge {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-bottom: -20px;
+  margin-top: 10px;
+  font-family: monospace; /* Estilo reloj */
+  text-align: right;
+}
+
+
+.history-section {
+  margin-top: 40px;
+  text-align: left;
+}
+
+.history-title {
+  font-size: 1.2rem;
+  color: var(--text-sub);
+  margin-bottom: 20px;
+}
+
+.history-item {
+  background: #fdfdfd;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 12px;
+  transition: transform 0.2s;
+}
+
+.history-item:hover {
+  transform: translateX(5px);
+}
+
+.history-original {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  font-style: italic;
+  margin: 0 0 8px 0;
+}
+
+.history-repaired {
+  font-size: 0.95rem;
+  color: var(--text-main);
+  margin: 0;
+  font-weight: 500;
+}
+
+.secondary-button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.secondary-button:hover {
+  background-color: #f3f4f6;
+  color: var(--text-main);
+  border-color: var(--text-sub);
+}
+
+.history-section {
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 1000px; }
+}
+
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.record-button {
+  background-color: var(--card-bg);
+  border: 2px solid var(--border);
+  color: var(--text-main);
+  padding: 10px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.record-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stop-button {
+  background-color: #fee2e2;
+  border: 2px solid #ef4444;
+  color: #ef4444;
+  padding: 10px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.audio-player {
+  height: 40px;
+  outline: none;
+}
+
+.animate-pulse {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}

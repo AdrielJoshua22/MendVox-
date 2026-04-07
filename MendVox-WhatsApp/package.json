@@ -1,0 +1,17 @@
+{
+  "name": "mendvox-whatsapp",
+  "version": "1.0.0",
+  "description": "Bridge entre WhatsApp y el backend de MendVox",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "axios": "^1.14.0",
+    "form-data": "^4.0.5",
+    "pino": "^10.3.1",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

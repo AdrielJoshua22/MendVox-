@@ -1,0 +1,43 @@
+# === SEGURIDAD Y SESIONES (CRÍTICO) ===
+# Ignora la sesión de WhatsApp para que nadie te robe la cuenta
+**/auth_info_baileys/
+**/.auth_info/
+
+# Ignora configuraciones con contraseñas de DB
+**/application.properties
+.env
+
+# === NODE.JS / REACT (Frontend y WhatsApp Bridge) ===
+# Las librerías no se suben, se instalan con 'npm install'
+**/node_modules/
+**/dist/
+**/build/
+package-lock.json
+.eslintcache
+
+# === JAVA / GRADLE (BackEnd) ===
+.gradle/
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+# El modelo de Vosk es muy pesado para GitHub
+**/src/main/resources/vosk-model/
+
+# === PYTHON (MendVox-TTS) ===
+MendVox-TTS/venv/
+MendVox-TTS/__pycache__/
+# Audios temporales generados por la IA
+MendVox-TTS/*.wav
+MendVox-TTS/*.mp3
+MendVox-TTS/*.m4a
+MendVox-TTS/output_clonado.wav
+MendVox-TTS/output_speech.mp3
+
+# === SYSTEM & IDE (macOS / IntelliJ) ===
+.idea/
+*.iml
+.DS_Store
+*.log
+# Archivos de error de Java que te salieron hoy
+hs_err_pid*
+replay_pid*

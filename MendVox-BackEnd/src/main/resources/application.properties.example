@@ -1,0 +1,9 @@
+# Configuración de la DB
+spring.datasource.url=jdbc:mysql://localhost:3306/mendvox_db
+spring.datasource.username=USUARIO_AQUÍ
+spring.datasource.password=CONTRASEÑA_AQUÍ
+
+# Hibernate (JPA)
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
