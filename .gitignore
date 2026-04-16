@@ -6,6 +6,7 @@
 # Ignora configuraciones con contraseñas de DB
 **/application.properties
 .env
+ llamar.js
 
 # === NODE.JS / REACT (Frontend y WhatsApp Bridge) ===
 # Las librerías no se suben, se instalan con 'npm install'
@@ -41,3 +42,17 @@ MendVox-TTS/output_speech.mp3
 # Archivos de error de Java que te salieron hoy
 hs_err_pid*
 replay_pid*
+
+
+  # Dependencias
+  node_modules/
+
+  # Sesión de WhatsApp (Asegúrate de que el nombre coincida con tu carpeta)
+  auth_info_baileys/
+  sessions/
+
+  # Credenciales y variables de entorno
+
+
+
+  # Archivos del sistema macOS
