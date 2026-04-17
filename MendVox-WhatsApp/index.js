@@ -18,23 +18,27 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 
+app.use((req, res, next) => {
+    res.setHeader('ngrok-skip-browser-warning', 'true');
+    next();
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.post('/incoming-call', (req, res) => {
-    console.log('[Telefonía] Llamada entrante detectada.');
+app.all('/incoming-call', (req, res) => {
+    console.log(`[Telefonía] Petición recibida con método: ${req.method}`);
     res.type('text/xml');
     res.send(`
       <Response>
         <Connect>
           <Stream url="wss://${req.headers.host}/audio-stream" />
         </Connect>
-        <Say language="es-ES">Bienvenido a MendVox financiero. Procesando conexión.</Say>
+        <Say language="es-ES">Conexión exitosa. MendVox escuchando.</Say>
         <Pause length="40"/>
       </Response>
     `);
 });
-
 wss.on('connection', (ws) => {
     console.log('[Telefonía] WebSocket conectado para streaming de audio.');
 
@@ -108,9 +112,9 @@ async function connectToWhatsApp() {
                 const form = new FormData();
                 form.append('audio', buffer, { filename: 'voice.ogg', contentType: 'audio/ogg' });
 
-                const response = await axios.post(`${NGROK_URL}/api/v1/mend/audio`, form, {
-                    headers: { ...form.getHeaders() }
-                });
+            const response = await axios.post('http://localhost:8000/api/tts', {
+                text: "Hola, soy MendVox, recibí tu audio pero todavía estoy aprendiendo a escucharlo. Por ahora te respondo con mi voz clonada."
+            });
 
                 await sock.sendMessage(from, { text: `Pensamiento: ${response.data.text}` });
 

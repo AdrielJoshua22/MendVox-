@@ -52,7 +52,7 @@ replay_pid*
   sessions/
 
   # Credenciales y variables de entorno
-
-
-
-  # Archivos del sistema macOS
+node_modules/
+.env
+llamar.js
+auth_info_baileys/
