@@ -128,8 +128,8 @@ async function connectToWhatsApp() {
                 preferenciasChat.set(from, 'TEXTO');
                 await sock.sendMessage(from, { text: "Dale, te escribo. Que me decias?" });
             } else {
-                await sock.sendMessage(from, { text: "Mmm, no te entendi bien. Decime 'audio' o 'texto'." });
-            }
+                await sock.sendMessage(from, { text: "Mmm, no te entendi bien. queres que te envie 'audio' o 'texto'." });
+            } s
             return;
         }
 
@@ -139,7 +139,7 @@ async function connectToWhatsApp() {
             const prompt = `
 Sos Adriel Joshua. Responde a este mensaje de WhatsApp de forma corta, natural y amigable.
 REGLAS ESTRICTAS:
-1. Escribi en espanol argentino informal (usa "vos", "tenes", "podes", "che", "dale").
+1. Escribi en espanol argentino informal (usa "vos", "tenes", "podes","dale").
 2. No uses acento neutro ni palabras como "tienes" o "puedes".
 3. No uses muletillas.
 4. Responde con texto plano. PROHIBIDO usar asteriscos, negritas, vinetas, listas numericas o caracteres especiales.
