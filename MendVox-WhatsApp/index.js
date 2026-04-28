@@ -20,7 +20,28 @@ const app = express();
 const chatsEnModoPrueba = new Set();
 const preferenciasChat = new Map();
 const mensajesGeneradosPorIA = new Set();
+const sesionesIA = new Map(); // <--- NUEVO: Memoria para guardar las charlas
 const server = http.createServer(app);
+
+// Base de datos simulada de deudores
+const deudores = [
+    {
+        telefono: "223703539409004@lid", // Tu ID del chat "Tú" para pruebas
+        nombre: "Adriel",
+        deuda: 150000,
+        servicio: "Tarjeta de Credito",
+        vencimiento: "10 de Abril",
+        estado: "mora"
+    },
+    {
+        telefono: "5492210000000@s.whatsapp.net",
+        nombre: "Lucas",
+        deuda: 45000,
+        servicio: "Cuota Universidad Siglo 21",
+        vencimiento: "5 de Abril",
+        estado: "mora"
+    }
+];
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -52,7 +73,7 @@ async function connectToWhatsApp() {
             "Che, queres que te mande audio o te escribo?",
             "Dale, te mando audios. Que me decias?",
             "Dale, te escribo. Que me decias?",
-            "Mmm, no te entendi bien. Decime 'audio' o 'texto'.",
+            "Mmm, no te entendi bien. queres que te envie 'audio' o 'texto'.",
             "Che, estoy recibiendo muchos mensajes juntos, bancame un ratito y te contesto bien.",
             "Modo laboratorio activado. Hablame normal, no hace falta la contrasena. Para salir, escribi 'desactivar prueba'.",
             "Modo laboratorio cerrado.",
@@ -87,6 +108,7 @@ async function connectToWhatsApp() {
 
         if (msg.key.fromMe && userInputLower === 'desactivar prueba') {
             chatsEnModoPrueba.delete(from);
+            sesionesIA.delete(from); // Limpiamos la memoria de la IA al salir
             console.log(`Modo prueba DESACTIVADO para: ${from}`);
             await sock.sendMessage(from, { text: "Modo laboratorio cerrado." });
             return;
@@ -111,6 +133,13 @@ async function connectToWhatsApp() {
             return;
         }
 
+        const cliente = deudores.find(d => d.telefono === from);
+
+        if (!cliente) {
+            console.log("Mensaje ignorado: El numero no esta en la base de datos de deudores.");
+            return;
+        }
+
         const estadoActual = preferenciasChat.get(from);
 
         if (!estadoActual) {
@@ -129,26 +158,52 @@ async function connectToWhatsApp() {
                 await sock.sendMessage(from, { text: "Dale, te escribo. Que me decias?" });
             } else {
                 await sock.sendMessage(from, { text: "Mmm, no te entendi bien. queres que te envie 'audio' o 'texto'." });
-            } s
+            }
             return;
         }
 
         try {
             console.log(`[MendVox] Pensando respuesta para: ${from} (Modo: ${estadoActual})`);
 
-            const prompt = `
-Sos Adriel Joshua. Responde a este mensaje de WhatsApp de forma corta, natural y amigable.
-REGLAS ESTRICTAS:
-1. Escribi en espanol argentino informal (usa "vos", "tenes", "podes","dale").
-2. No uses acento neutro ni palabras como "tienes" o "puedes".
-3. No uses muletillas.
-4. Responde con texto plano. PROHIBIDO usar asteriscos, negritas, vinetas, listas numericas o caracteres especiales.
-5. PROHIBIDO usar emojis. Cero emojis.
-Mensaje: "${userInput}"
-`;
+            // --- NUEVO: Gestor de Memoria con startChat ---
+            let chatIA = sesionesIA.get(from);
 
-            const aiResult = await aiModel.generateContent(prompt);
+            if (!chatIA) {
+                // Si es el primer mensaje, creamos la sesión y le pasamos las reglas como historial previo
+                const promptSistema = `
+Sos un agente de cobranzas virtual de la empresa MendVox.
+Estas hablando por WhatsApp con ${cliente.nombre}.
+
+DATOS DE LA DEUDA:
+- Monto adeudado: $${cliente.deuda}
+- Servicio: ${cliente.servicio}
+- Fecha de vencimiento: ${cliente.vencimiento}
+
+TU OBJETIVO:
+Informarle a ${cliente.nombre} sobre su saldo y lograr que confirme una fecha de pago para esta semana. Si no tiene el dinero, ofrecele 2 cuotas.
+
+REGLAS ESTRICTAS:
+1. Escribi en espanol argentino informal, pero manteniendo el respeto.
+2. NO saludes en cada mensaje. Saluda SOLO en tu primera intervencion. Despues, continua la conversacion con naturalidad.
+3. Tus respuestas deben ser cortas, de no mas de 3 oraciones.
+4. Responde con texto plano. PROHIBIDO usar asteriscos, negritas o listas.
+5. PROHIBIDO usar emojis.
+`;
+                chatIA = aiModel.startChat({
+                    history: [
+                        { role: "user", parts: [{ text: promptSistema }] },
+                        { role: "model", parts: [{ text: "Entendido. A partir de ahora actuare como el agente de cobranzas siguiendo estas reglas y recordando la conversacion." }] }
+                    ]
+                });
+
+                sesionesIA.set(from, chatIA);
+                console.log(`[MendVox] Nueva sesion de chat con memoria creada para: ${from}`);
+            }
+
+            // Ahora le mandamos el mensaje a la sesión guardada, no al modelo vacío
+            const aiResult = await chatIA.sendMessage(userInput);
             const textoFinal = aiResult.response.text();
+            // ----------------------------------------------
 
             mensajesGeneradosPorIA.add(textoFinal);
 
