@@ -13,7 +13,6 @@ import xlsx from "xlsx";
 import mysql from "mysql2/promise";
 import cors from 'cors';
 
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const aiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -34,13 +33,119 @@ const mensajesGeneradosPorIA = new Set();
 const sesionesIA = new Map();
 const server = http.createServer(app);
 
+let sock;
+
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+app.get('/lanzar-campana', async (req, res) => {
+    try {
+        const workbook = xlsx.readFile('deudores.xlsx');
+        const sheetName = workbook.SheetNames[0];
+        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        for (const cliente of data) {
+            if (!cliente.telefono) continue;
+
+            const numeroString = cliente.telefono.toString();
+
+            await pool.query(`
+                INSERT INTO clientes (telefono, nombre, deuda, servicio, vencimiento, estado_campana)
+                VALUES (?, ?, ?, ?, ?, 'pendiente')
+                ON DUPLICATE KEY UPDATE deuda = VALUES(deuda), vencimiento = VALUES(vencimiento), estado_campana = 'pendiente'
+            `, [numeroString, cliente.nombre, cliente.deuda, cliente.servicio, cliente.vencimiento]);
+        }
+        res.send("Campaña cargada con éxito. El motor en segundo plano comenzará a enviar los mensajes.");
+        console.log("[Campaña] Base de datos actualizada. Clientes en cola.");
+    } catch (error) {
+        console.error("[Campaña Error] Archivo Excel no encontrado o invalido.", error);
+        if (!res.headersSent) res.status(500).send("Error procesando campaña.");
+    }
+});
+
+app.get('/api/clientes', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT * FROM clientes");
+        res.json(rows);
+    } catch (error) {
+        console.error("Error obteniendo clientes:", error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+});
+
+app.get('/api/chats/:telefono', async (req, res) => {
+    const telefono = req.params.telefono;
+    try {
+        const [rows] = await pool.query(
+            "SELECT remitente, mensaje, fecha FROM historial_chats WHERE telefono_cliente = ? ORDER BY fecha ASC",
+            [telefono]
+        );
+        res.json(rows);
+    } catch (error) {
+        console.error(`Error obteniendo chats para ${telefono}:`, error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+});
+
+async function motorDeCampana() {
+    if (!sock) return;
+
+    try {
+        await pool.query(`
+            UPDATE clientes
+            SET estado_campana = 'pausada'
+            WHERE estado_campana = 'activa'
+            AND ultima_interaccion < NOW() - INTERVAL 10 MINUTE
+        `);
+
+        const [activos] = await pool.query("SELECT COUNT(*) as total FROM clientes WHERE estado_campana = 'activa'");
+        const conversacionesActivas = activos[0].total;
+        const cuposDisponibles = 10 - conversacionesActivas;
+
+        if (cuposDisponibles > 0) {
+            const [pendientes] = await pool.query("SELECT * FROM clientes WHERE estado_campana = 'pendiente' LIMIT ?", [cuposDisponibles]);
+
+            if (pendientes.length > 0) {
+                console.log(`[Motor] Hay ${cuposDisponibles} lugares. Despertando a ${pendientes.length} clientes nuevos...`);
+            }
+
+            for (const cliente of pendientes) {
+                const numeroFormateado = `${cliente.telefono}@s.whatsapp.net`;
+                const mensajeInicial = `Hola ${cliente.nombre}, soy Matias de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
+
+                const pausaAleatoria = Math.floor(Math.random() * (28000 - 12000 + 1)) + 12000;
+                await delay(pausaAleatoria);
+
+                try {
+                    await sock.sendMessage(numeroFormateado, { text: mensajeInicial });
+                    mensajesGeneradosPorIA.add(mensajeInicial);
+
+                    await pool.query(
+                        "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)",
+                        [cliente.telefono, mensajeInicial]
+                    );
+                    await pool.query(
+                        "UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?",
+                        [cliente.telefono]
+                    );
+
+                    console.log(`[Motor] Mensaje enviado a ${cliente.nombre}.`);
+                } catch (error) {
+                    console.error(`[Error Motor] No se pudo contactar a ${cliente.telefono}`, error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("[Error Fatal del Motor]:", error);
+    }
+}
+
+setInterval(motorDeCampana, 60000);
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     const { version } = await fetchLatestBaileysVersion();
 
-    const sock = makeWASocket({
+    sock = makeWASocket({
         version,
         auth: state,
         logger: pino({ level: 'silent' }),
@@ -52,55 +157,6 @@ async function connectToWhatsApp() {
         if (qr) qrcode.generate(qr, { small: true });
         if (connection === 'open') console.log("[WhatsApp] MendVox Cerebro y Voz activos. Conectado a MySQL.");
     });
-
-app.get('/lanzar-campana', async (req, res) => {
-        try {
-            const workbook = xlsx.readFile('deudores.xlsx');
-            const sheetName = workbook.SheetNames[0];
-            const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-            for (const cliente of data) {
-                if (!cliente.telefono) continue;
-
-                const numeroString = cliente.telefono.toString();
-
-                await pool.query(`
-                    INSERT INTO clientes (telefono, nombre, deuda, servicio, vencimiento, estado_campana)
-                    VALUES (?, ?, ?, ?, ?, 'pendiente')
-                    ON DUPLICATE KEY UPDATE deuda = VALUES(deuda), vencimiento = VALUES(vencimiento), estado_campana = 'pendiente'
-                `, [numeroString, cliente.nombre, cliente.deuda, cliente.servicio, cliente.vencimiento]);
-            }
-            res.send("Campaña cargada con éxito. El motor en segundo plano comenzará a enviar los mensajes.");
-            console.log("[Campaña] Base de datos actualizada. Clientes en cola.");
-        } catch (error) {
-            console.error("[Campaña Error] Archivo Excel no encontrado o invalido.", error);
-            if (!res.headersSent) res.status(500).send("Error procesando campaña.");
-        }
-    });
-
-    app.get('/api/clientes', async (req, res) => {
-            try {
-                const [rows] = await pool.query("SELECT * FROM clientes");
-                res.json(rows);
-            } catch (error) {
-                console.error("Error obteniendo clientes:", error);
-                res.status(500).json({ error: "Error interno del servidor" });
-            }
-        });
-
-        app.get('/api/chats/:telefono', async (req, res) => {
-            const telefono = req.params.telefono;
-            try {
-                const [rows] = await pool.query(
-                    "SELECT remitente, mensaje, fecha FROM historial_chats WHERE telefono_cliente = ? ORDER BY fecha ASC",
-                    [telefono]
-                );
-                res.json(rows);
-            } catch (error) {
-                console.error(`Error obteniendo chats para ${telefono}:`, error);
-                res.status(500).json({ error: "Error interno del servidor" });
-            }
-        });
 
     sock.ev.on('messages.upsert', async m => {
         if (m.type !== 'notify') return;
@@ -147,9 +203,16 @@ app.get('/lanzar-campana', async (req, res) => {
                 console.log(`Bloqueado: el numero ${numeroDB} no esta en MySQL`);
                 return;
             }
-                await pool.query(
-                    "UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroDB]
-                );
+
+            await pool.query(
+                "UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroDB]
+            );
+
+            await pool.query(
+                "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)",
+                [numeroDB, userInput]
+            );
+
             console.log(`[Mensaje Entrante] ${cliente.nombre}: ${userInput}`);
 
             if (!preferenciasChat.has(from)) {
@@ -230,62 +293,7 @@ REGLAS ESTRICTAS DE HUMANIZACION:
         }
     });
 }
-async function motorDeCampana() {
-        try {
-            // 1. Pausar a los que no contestaron por más de 10 minutos (600 segundos)
-            await pool.query(`
-                UPDATE clientes
-                SET estado_campana = 'pausada'
-                WHERE estado_campana = 'activa'
-                AND ultima_interaccion < NOW() - INTERVAL 10 MINUTE
-            `);
 
-            // 2. Contar cuántos están activos en este momento hablando con Matías
-            const [activos] = await pool.query("SELECT COUNT(*) as total FROM clientes WHERE estado_campana = 'activa'");
-            const conversacionesActivas = activos[0].total;
-            const cuposDisponibles = 10 - conversacionesActivas; // El límite sagrado de 10
-
-            // 3. Si hay espacio, metemos clientes nuevos a la máquina
-            if (cuposDisponibles > 0) {
-                const [pendientes] = await pool.query("SELECT * FROM clientes WHERE estado_campana = 'pendiente' LIMIT ?", [cuposDisponibles]);
-
-                if (pendientes.length > 0) {
-                    console.log(`[Motor] Hay ${cuposDisponibles} lugares. Despertando a ${pendientes.length} clientes nuevos...`);
-                }
-
-                for (const cliente of pendientes) {
-                    const numeroFormateado = `${cliente.telefono}@s.whatsapp.net`;
-                    const mensajeInicial = `Hola ${cliente.nombre}, soy Matias de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
-
-                    // Humanización total: pausa aleatoria entre 12 y 28 segundos antes de enviar
-                    const pausaAleatoria = Math.floor(Math.random() * (28000 - 12000 + 1)) + 12000;
-                    await delay(pausaAleatoria);
-
-                    try {
-                        await sock.sendMessage(numeroFormateado, { text: mensajeInicial });
-                        mensajesGeneradosPorIA.add(mensajeInicial);
-
-                        // Guardamos en el historial y lo marcamos como activo con la hora actual
-                        await pool.query(
-                            "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)",
-                            [cliente.telefono, mensajeInicial]
-                        );
-                        await pool.query(
-                            "UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?",
-                            [cliente.telefono]
-                        );
-
-                        console.log(`[Motor] Mensaje enviado a ${cliente.nombre}.`);
-                    } catch (error) {
-                        console.error(`[Error Motor] No se pudo contactar a ${cliente.telefono}`, error);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("[Error Fatal del Motor]:", error);
-        }
-    }
-    setInterval(motorDeCampana, 60000);
 server.listen(PORT, () => {
     connectToWhatsApp();
 });
