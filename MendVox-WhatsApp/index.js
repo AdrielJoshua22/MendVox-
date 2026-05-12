@@ -10,22 +10,31 @@ import express from "express";
 import http from "http";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import xlsx from "xlsx";
+import mysql from "mysql2/promise";
+import cors from 'cors';
+
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const aiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+const pool = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
+});
 
 const PYTHON_BACKEND_URL = "http://localhost:8000/api/tts";
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+app.use(cors());
 const preferenciasChat = new Map();
 const mensajesGeneradosPorIA = new Set();
 const sesionesIA = new Map();
 const server = http.createServer(app);
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-let deudores = [];
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -41,7 +50,7 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', ({ connection, qr }) => {
         if (qr) qrcode.generate(qr, { small: true });
-        if (connection === 'open') console.log("[WhatsApp] MendVox Cerebro y Voz activos.");
+        if (connection === 'open') console.log("[WhatsApp] MendVox Cerebro y Voz activos. Conectado a MySQL.");
     });
 
     app.get('/lanzar-campana', async (req, res) => {
@@ -50,34 +59,69 @@ async function connectToWhatsApp() {
             const sheetName = workbook.SheetNames[0];
             const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-            deudores = data;
             res.send("Campaña iniciada con exito. Revisar terminal.");
 
-            for (const cliente of deudores) {
+            for (const cliente of data) {
                 if (!cliente.telefono) {
-                    console.log(`[Alerta] Fila ignorada. No se encontró la columna 'telefono' para este cliente:`, cliente);
+                    console.log(`[Alerta] Fila ignorada. No se encontró la columna 'telefono' para:`, cliente);
                     continue;
                 }
 
                 const numeroString = cliente.telefono.toString();
-                const numeroFormateado = `${numeroString}@s.whatsapp.net`;
 
+                await pool.query(`
+                    INSERT INTO clientes (telefono, nombre, deuda, servicio, vencimiento)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE deuda = VALUES(deuda), vencimiento = VALUES(vencimiento)
+                `, [numeroString, cliente.nombre, cliente.deuda, cliente.servicio, cliente.vencimiento]);
+
+                const numeroFormateado = `${numeroString}@s.whatsapp.net`;
                 const mensajeInicial = `Hola ${cliente.nombre}, soy Matias de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
 
                 try {
                     await sock.sendMessage(numeroFormateado, { text: mensajeInicial });
                     mensajesGeneradosPorIA.add(mensajeInicial);
-                    console.log(`[Campaña] Mensaje inicial enviado a ${numeroString}`);
+
+                    await pool.query(
+                        "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)",
+                        [numeroString, mensajeInicial]
+                    );
+
+                    console.log(`[Campaña] Mensaje inicial enviado y guardado en BD a ${numeroString}`);
                     await delay(8000);
                 } catch (error) {
                     console.error(`[Error] No se pudo enviar a ${numeroString}`);
                 }
             }
         } catch (error) {
-            console.error("[Campaña Error] Archivo Excel no encontrado o invalido.");
-            if (!res.headersSent) res.status(500).send("Error: Verifica que deudores.xlsx exista en la raiz del proyecto.");
+            console.error("[Campaña Error] Archivo Excel no encontrado o invalido.", error);
+            if (!res.headersSent) res.status(500).send("Error procesando campaña.");
         }
     });
+
+    app.get('/api/clientes', async (req, res) => {
+            try {
+                const [rows] = await pool.query("SELECT * FROM clientes");
+                res.json(rows);
+            } catch (error) {
+                console.error("Error obteniendo clientes:", error);
+                res.status(500).json({ error: "Error interno del servidor" });
+            }
+        });
+
+        app.get('/api/chats/:telefono', async (req, res) => {
+            const telefono = req.params.telefono;
+            try {
+                const [rows] = await pool.query(
+                    "SELECT remitente, mensaje, fecha FROM historial_chats WHERE telefono_cliente = ? ORDER BY fecha ASC",
+                    [telefono]
+                );
+                res.json(rows);
+            } catch (error) {
+                console.error(`Error obteniendo chats para ${telefono}:`, error);
+                res.status(500).json({ error: "Error interno del servidor" });
+            }
+        });
 
     sock.ev.on('messages.upsert', async m => {
         if (m.type !== 'notify') return;
@@ -85,10 +129,6 @@ async function connectToWhatsApp() {
         const msg = m.messages[0];
         const userInput = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
         const from = msg.key.remoteJid;
-
-        console.log("Remitente:", from);
-        console.log("Texto:", userInput);
-        console.log("fromMe:", msg.key.fromMe);
 
         const frasesDelBot = [
             "Listo, a partir de ahora te respondo por texto.",
@@ -106,7 +146,6 @@ async function connectToWhatsApp() {
 
         const userInputLower = userInput.toLowerCase();
 
-        // Dejé ocultos los comandos "modo texto" y "modo audio" solo por si querés probar tu Python TTS.
         if (msg.key.fromMe && userInputLower === 'modo texto') {
             preferenciasChat.set(from, 'TEXTO');
             await sock.sendMessage(from, { text: "Listo, a partir de ahora te respondo por texto." });
@@ -119,20 +158,30 @@ async function connectToWhatsApp() {
             return;
         }
 
-        const cliente = deudores.find(d => from && from.includes(d.telefono.toString()));
-
-        if (!cliente) {
-            console.log("Bloqueado: numero no esta en el Excel de deudores");
-            return;
-        }
-
-        if (!preferenciasChat.has(from)) {
-            preferenciasChat.set(from, 'TEXTO');
-        }
-
-        const estadoActual = preferenciasChat.get(from);
+        const numeroDB = from.split('@')[0];
 
         try {
+            const [rows] = await pool.query("SELECT * FROM clientes WHERE telefono = ?", [numeroDB]);
+            const cliente = rows[0];
+
+            if (!cliente) {
+                console.log(`Bloqueado: el numero ${numeroDB} no esta en MySQL`);
+                return;
+            }
+
+            await pool.query(
+                "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)",
+                [numeroDB, userInput]
+            );
+
+            console.log(`[Mensaje Entrante] ${cliente.nombre}: ${userInput}`);
+
+            if (!preferenciasChat.has(from)) {
+                preferenciasChat.set(from, 'TEXTO');
+            }
+
+            const estadoActual = preferenciasChat.get(from);
+
             let chatIA = sesionesIA.get(from);
 
             if (!chatIA) {
@@ -170,6 +219,7 @@ REGLAS ESTRICTAS DE HUMANIZACION:
             const textoFinal = aiResult.response.text();
 
             mensajesGeneradosPorIA.add(textoFinal);
+            console.log(`[MendVox IA] Matías responde: ${textoFinal}`);
 
             if (estadoActual === 'TEXTO') {
                 await sock.sendMessage(from, { text: textoFinal });
@@ -191,8 +241,14 @@ REGLAS ESTRICTAS DE HUMANIZACION:
                 }
             }
 
+            await pool.query(
+                "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)",
+                [numeroDB, textoFinal]
+            );
+
         } catch (e) {
-            if (e.message.includes("429") || e.message.includes("Quota exceeded") || e.message.includes("503")) {
+            console.error(e);
+            if (e.message && (e.message.includes("429") || e.message.includes("Quota exceeded") || e.message.includes("503"))) {
                 await sock.sendMessage(from, { text: "Che, el sistema está medio colapsado en este momento. Bancame unos minutitos y probá de nuevo." });
             }
         }
