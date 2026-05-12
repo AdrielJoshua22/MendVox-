@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import './App.css';
 
 const convertToTrueWav = async (rawBlob) => {
@@ -41,15 +42,13 @@ const convertToTrueWav = async (rawBlob) => {
   return new Blob([view], { type: 'audio/wav' });
 };
 
-function App() {
+function AudioMender() {
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
-
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
-
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -151,15 +150,14 @@ function App() {
         });
       }
 
-           const data = await response.json();
-           setResult(data.text);
-           if (data.audioBase64) {
-             const audio = new Audio(`data:audio/mp3;base64,${data.audioBase64}`);
-             audio.play();
-           }
+      const data = await response.json();
+      setResult(data.text);
+      if (data.audioBase64) {
+        const audio = new Audio(`data:audio/mp3;base64,${data.audioBase64}`);
+        audio.play();
+      }
 
       if (audioBlob) setAudioBlob(null);
-
       fetchHistory();
 
     } catch (error) {
@@ -172,87 +170,216 @@ function App() {
   };
 
   return (
-    <div className="container">
-      <main className="card">
-        <header>
-          <h1 className="logo">MendVox</h1>
-          <p className="subtitle">IA para limpiar tus pensamientos</p>
-        </header>
+    <main className="card">
+      <header>
+        <h1 className="logo">MendVox</h1>
+        <p className="subtitle">IA para limpiar tus pensamientos</p>
+      </header>
 
-        <section className="input-section">
-          <div className="audio-controls">
-            {!isRecording ? (
-              <button className="record-button" onClick={startRecording}>
-                Grabar Audio
-              </button>
-            ) : (
-              <button className="stop-button animate-pulse" onClick={stopRecording}>
-                Detener Grabación
-              </button>
-            )}
-
-            {audioUrl && !isRecording && (
-              <audio className="audio-player" src={audioUrl} controls />
-            )}
-          </div>
-
-          <textarea
-            placeholder="Escribe, pega o graba lo que tienes en mente..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={isRecording}
-          />
-
-          <button
-            className={`mend-button ${loading ? 'loading' : ''}`}
-            onClick={handleMend}
-            disabled={loading || (!text && !audioBlob)}
-          >
-            {loading ? `Reparando... (${timer}s)` : "Mend It"}
-          </button>
-
-          {result && (
-            <p className="timer-badge">Tiempo de respuesta: {timer} segundos</p>
+      <section className="input-section">
+        <div className="audio-controls">
+          {!isRecording ? (
+            <button className="record-button" onClick={startRecording}>Grabar Audio</button>
+          ) : (
+            <button className="stop-button animate-pulse" onClick={stopRecording}>Detener Grabación</button>
           )}
-        </section>
-
-        {result && (
-          <section className="result-section animate-fade-in">
-            <div className="divider"></div>
-            <p className="result-text">{result}</p>
-          </section>
-        )}
-
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button
-            className="secondary-button"
-            onClick={() => setShowHistory(!showHistory)}
-          >
-            {showHistory ? "Ocultar Historial" : "Ver Historial"}
-          </button>
+          {audioUrl && !isRecording && <audio className="audio-player" src={audioUrl} controls />}
         </div>
 
-        {showHistory && history.length > 0 && (
-          <section className="history-section animate-fade-in">
-            <div className="divider"></div>
-            <h2 className="history-title">Historial Reciente</h2>
-            <div className="history-list">
-              {history.map((item) => (
-                <div key={item.id} className="history-item">
-                  <p className="history-original">"{item.originalText}"</p>
-                  <p className="history-repaired">{item.repairedText}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+        <textarea
+          placeholder="Escribe, pega o graba lo que tienes en mente..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={isRecording}
+        />
+
+        <button
+          className={`mend-button ${loading ? 'loading' : ''}`}
+          onClick={handleMend}
+          disabled={loading || (!text && !audioBlob)}
+        >
+          {loading ? `Reparando... (${timer}s)` : "Mend It"}
+        </button>
+        {result && <p className="timer-badge">Tiempo de respuesta: {timer} segundos</p>}
+      </section>
+
+      {result && (
+        <section className="result-section animate-fade-in">
+          <div className="divider"></div>
+          <p className="result-text">{result}</p>
+        </section>
+      )}
+
+      <div style={{ textAlign: 'center', marginTop: '20px' }}>
+        <button className="secondary-button" onClick={() => setShowHistory(!showHistory)}>
+          {showHistory ? "Ocultar Historial" : "Ver Historial"}
+        </button>
+      </div>
+
+      {showHistory && history.length > 0 && (
+        <section className="history-section animate-fade-in">
+          <div className="divider"></div>
+          <h2 className="history-title">Historial Reciente</h2>
+          <div className="history-list">
+            {history.map((item) => (
+              <div key={item.id} className="history-item">
+                <p className="history-original">"{item.originalText}"</p>
+                <p className="history-repaired">{item.repairedText}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}
+
+function WhatsAppDashboard() {
+  const [clientes, setClientes] = useState([]);
+  const [clienteActivo, setClienteActivo] = useState(null);
+  const [historialChat, setHistorialChat] = useState([]);
+
+  useEffect(() => {
+    axios.get('http://localhost:3000/api/clientes')
+      .then(res => setClientes(res.data))
+      .catch(err => console.error("Error al cargar deudores", err));
+  }, []);
+
+  const abrirChat = (cliente) => {
+    setClienteActivo(cliente);
+
+    axios.get(`http://localhost:3000/api/chats/${cliente.telefono}`)
+      .then(res => setHistorialChat(res.data))
+      .catch(err => console.error("Error al cargar el historial del chat", err));
+  };
+
+  const cerrarChat = () => {
+    setClienteActivo(null);
+    setHistorialChat([]);
+  };
+
+  return (
+    <main className="card" style={{ maxWidth: '900px' }}>
+      <header>
+        <h1 className="logo" style={{ color: '#25D366' }}>MendVox Cobranzas</h1>
+        <p className="subtitle">Gestión automatizada por WhatsApp</p>
+      </header>
+
+      <section className="input-section" style={{ marginTop: '20px' }}>
+
+        {!clienteActivo && (
+          <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '10px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #ddd' }}>
+                <th style={{ padding: '10px' }}>Nombre</th>
+                <th style={{ padding: '10px' }}>Teléfono</th>
+                <th style={{ padding: '10px' }}>Deuda</th>
+                <th style={{ padding: '10px' }}>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientes.length > 0 ? (
+                clientes.map(c => (
+                  <tr key={c.telefono} className="fila-clickeable" onClick={() => abrirChat(c)}>
+                    <td style={{ padding: '10px' }}>{c.nombre}</td>
+                    <td style={{ padding: '10px' }}>{c.telefono}</td>
+                    <td style={{ padding: '10px', fontWeight: 'bold' }}>${c.deuda}</td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{
+                        backgroundColor: c.estado === 'mora' ? '#ffebee' : '#e8f5e9',
+                        color: c.estado === 'mora' ? '#c62828' : '#2e7d32',
+                        padding: '4px 8px', borderRadius: '12px', fontSize: '0.85em'
+                      }}>
+                        {c.estado.toUpperCase()}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '20px' }}>
+                    No hay deudores cargados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         )}
-      </main>
+
+        {/* VISTA 2: HISTORIAL DE CHAT (Si tocamos a un cliente) */}
+        {clienteActivo && (
+          <div className="animate-fade-in">
+            <div className="chat-header">
+              <div style={{ textAlign: 'left' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Chat con {clienteActivo.nombre}</h3>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-sub)' }}>
+                  {clienteActivo.telefono} • Deuda: ${clienteActivo.deuda}
+                </p>
+              </div>
+              <button className="secondary-button" onClick={cerrarChat}>
+                ← Volver a la lista
+              </button>
+            </div>
+
+            <div className="chat-container">
+              {historialChat.length > 0 ? (
+                historialChat.map((msg, idx) => (
+                  <div key={idx} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
+                    <span>{msg.mensaje}</span>
+                    <span className="fecha-chat">
+                      {new Date(msg.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p style={{ textAlign: 'center', color: '#667781', marginTop: '20px' }}>
+                  No hay mensajes registrados con este cliente.
+                </p>
+              )}
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '15px' }}>
+              *Para recargar mensajes nuevos, volvé a la lista y entrá de nuevo.
+            </p>
+          </div>
+        )}
+
+      </section>
+    </main>
+  );
+}
+
+function App() {
+  const [vistaActiva, setVistaActiva] = useState('audio'); // 'audio' o 'whatsapp'
+
+  return (
+    <div className="container">
+      {/* Menú de Navegación Simple */}
+      <nav style={{ display: 'flex', gap: '10px', marginBottom: '20px', justifyContent: 'center' }}>
+        <button
+          className={vistaActiva === 'audio' ? 'mend-button' : 'secondary-button'}
+          onClick={() => setVistaActiva('audio')}
+          style={{ width: 'auto', padding: '10px 20px', margin: 0 }}
+        >
+          Limpiador de Audio
+        </button>
+        <button
+          className={vistaActiva === 'whatsapp' ? 'mend-button' : 'secondary-button'}
+          onClick={() => setVistaActiva('whatsapp')}
+          style={{ width: 'auto', padding: '10px 20px', margin: 0, backgroundColor: vistaActiva === 'whatsapp' ? '#25D366' : '' }}
+        >
+          WhatsApp Dashboard
+        </button>
+      </nav>
+
+      {/* Renderizado condicional */}
+      {vistaActiva === 'audio' ? <AudioMender /> : <WhatsAppDashboard />}
 
       <footer>
-        <p>Running on Local Llama 3.1 • MacBook M4</p>
+        <p>Running on Local Llama 3.1 & Gemini Flash • MacBook M4</p>
       </footer>
     </div>
-  );
+);
 }
 
 export default App;

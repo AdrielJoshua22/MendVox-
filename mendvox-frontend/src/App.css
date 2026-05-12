@@ -1,37 +1,66 @@
+/* ==========================================
+   VARIABLES GLOBALES
+   ========================================== */
 :root {
   --bg-color: #f9fafb;
   --card-bg: #ffffff;
   --text-main: #1f2937;
   --text-sub: #6b7280;
-  --accent: #3b82f6;
+  --accent: #25D366; /* Color verde WhatsApp unificado */
+  --accent-hover: #20bd5a;
   --border: #e5e7eb;
 }
 
+/* ==========================================
+   RESET Y ESTRUCTURA BASE
+   ========================================== */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-main);
+}
+
+/* El truco para centrar apps en React es aplicarlo al #root */
+#root {
   display: flex;
   justify-content: center;
-  align-items: center;
   min-height: 100vh;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
 .container {
   width: 100%;
-  max-width: 600px;
-  padding: 20px;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+nav {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  justify-content: center;
+  width: 100%;
 }
 
 .card {
+  width: 100%;
   background: var(--card-bg);
   padding: 40px;
   border-radius: 24px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   border: 1px solid var(--border);
+  box-sizing: border-box;
+  text-align: center;
 }
 
+/* ==========================================
+   TIPOGRAFÍA Y TEXTOS
+   ========================================== */
 .logo {
   font-size: 2.5rem;
   font-weight: 800;
@@ -46,6 +75,50 @@ body {
   font-size: 1.1rem;
 }
 
+/* ==========================================
+   BOTONES
+   ========================================== */
+button {
+  cursor: pointer;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.mend-button {
+  padding: 14px 24px;
+  background-color: var(--accent);
+  color: white;
+}
+
+.mend-button:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+}
+
+.mend-button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  padding: 14px 24px;
+}
+
+.secondary-button:hover {
+  background-color: #f3f4f6;
+  color: var(--text-main);
+  border-color: var(--text-sub);
+}
+
+/* ==========================================
+   INPUTS Y AUDIO (Limpiador)
+   ========================================== */
 .input-section {
   margin-top: 32px;
   display: flex;
@@ -69,29 +142,65 @@ textarea:focus {
   border-color: var(--accent);
 }
 
-.mend-button {
-  margin-top: 16px;
-  padding: 14px;
-  background-color: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 1rem;
+.audio-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.record-button {
+  background-color: var(--card-bg);
+  border: 2px solid var(--border);
+  color: var(--text-main);
+  padding: 10px 20px;
+}
+
+.record-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stop-button {
+  background-color: #fee2e2;
+  border: 2px solid #ef4444;
+  color: #ef4444;
+  padding: 10px 20px;
+}
+
+.audio-player {
+  height: 40px;
+  outline: none;
+}
+
+/* ==========================================
+   TABLA DE COBRANZAS (Dashboard)
+   ========================================== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th {
+  background-color: var(--bg-color);
+  color: var(--text-main);
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  border-bottom: 2px solid var(--border);
+  padding: 12px;
+  text-align: left;
 }
 
-.mend-button:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+  text-align: left;
 }
 
-.mend-button:disabled {
-  background-color: #d1d5db;
-  cursor: not-allowed;
-}
-
+/* ==========================================
+   UTILIDADES Y ANIMACIONES
+   ========================================== */
 .divider {
   height: 1px;
   background: var(--border);
@@ -102,9 +211,10 @@ textarea:focus {
   font-size: 1.1rem;
   line-height: 1.6;
   color: var(--text-main);
-  background: #eff6ff;
+  background: #eff6ff; /* Fondo azulito suave para resultados */
   padding: 20px;
   border-radius: 12px;
+  text-align: left;
 }
 
 footer {
@@ -114,34 +224,28 @@ footer {
   color: var(--text-sub);
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 .timer-badge {
   font-size: 0.85rem;
   color: var(--text-sub);
   margin-bottom: -20px;
   margin-top: 10px;
-  font-family: monospace; /* Estilo reloj */
+  font-family: monospace;
   text-align: right;
 }
 
-
+/* Historial */
 .history-section {
   margin-top: 40px;
   text-align: left;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
 }
 
 .history-title {
   font-size: 1.2rem;
   color: var(--text-sub);
   margin-bottom: 20px;
+  text-align: center;
 }
 
 .history-item {
@@ -171,70 +275,14 @@ footer {
   font-weight: 500;
 }
 
-.secondary-button {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-sub);
-  padding: 10px 20px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
+/* Animaciones */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
 }
 
-.secondary-button:hover {
-  background-color: #f3f4f6;
-  color: var(--text-main);
-  border-color: var(--text-sub);
-}
-
-.history-section {
-  overflow: hidden;
-  animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 1000px; }
-}
-
-.audio-controls {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.record-button {
-  background-color: var(--card-bg);
-  border: 2px solid var(--border);
-  color: var(--text-main);
-  padding: 10px 20px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.record-button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.stop-button {
-  background-color: #fee2e2;
-  border: 2px solid #ef4444;
-  color: #ef4444;
-  padding: 10px 20px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.audio-player {
-  height: 40px;
-  outline: none;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-pulse {
@@ -244,4 +292,73 @@ footer {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: .5; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 1000px; }
+}
+
+/* ==========================================
+   VISTA DE CHAT (Burbujas estilo WhatsApp)
+   ========================================== */
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 450px;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: #efeae2; /* El fondo clásico de WhatsApp */
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.burbuja {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  position: relative;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.burbuja.bot {
+  align-self: flex-end;
+  background-color: #d9fdd3; /* Verde clarito de los mensajes enviados */
+  border-top-right-radius: 2px;
+}
+
+.burbuja.cliente {
+  align-self: flex-start;
+  background-color: #ffffff;
+  border-top-left-radius: 2px;
+}
+
+.fecha-chat {
+  display: block;
+  font-size: 0.7rem;
+  color: #667781;
+  text-align: right;
+  margin-top: 5px;
+}
+
+/* Para que las filas de la tabla parezcan clickeables */
+.fila-clickeable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.fila-clickeable:hover {
+  background-color: #f8f9fa;
 }
