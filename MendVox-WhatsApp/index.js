@@ -28,6 +28,7 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 const preferenciasChat = new Map();
 const mensajesGeneradosPorIA = new Set();
 const sesionesIA = new Map();
@@ -294,6 +295,62 @@ REGLAS ESTRICTAS DE HUMANIZACION:
     });
 }
 
+app.post('/api/campana/disparar', async (req, res) => {
+    console.log("\n--> [Disparo Manual] Petición recibida desde React!");
+    const { telefonos } = req.body;
+    console.log("--> Teléfonos seleccionados:", telefonos);
+
+    if (!telefonos || telefonos.length === 0) {
+        return res.status(400).json({ error: "No se seleccionaron clientes" });
+    }
+
+    try {
+        const placeholders = telefonos.map(() => '?').join(',');
+        console.log("--> Buscando clientes en MySQL...");
+        const [clientes] = await pool.query(`SELECT * FROM clientes WHERE telefono IN (${placeholders})`, telefonos);
+        console.log(`--> Se encontraron ${clientes.length} clientes en la base de datos.`);
+
+        for (const cliente of clientes) {
+            if (cliente.estado_campana === 'activa') {
+                console.log(`--> ${cliente.nombre} ya está activo. Saltando...`);
+                continue;
+            }
+
+            const numeroFormateado = `${cliente.telefono}@s.whatsapp.net`;
+            const mensajeInicial = `Hola ${cliente.nombre}, soy Matias de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
+
+            console.log(`--> Intentando enviar WhatsApp a: ${numeroFormateado} ... (Si se traba acá, es un problema del número)`);
+
+            try {
+                // ACA ES DONDE SUELE COLGARSE SI EL NUMERO ESTÁ MAL
+                await sock.sendMessage(numeroFormateado, { text: mensajeInicial });
+                console.log(`--> ¡WhatsApp enviado con éxito a ${cliente.nombre}!`);
+
+                mensajesGeneradosPorIA.add(mensajeInicial);
+
+                await pool.query(
+                    "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)",
+                    [cliente.telefono, mensajeInicial]
+                );
+                await pool.query(
+                    "UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?",
+                    [cliente.telefono]
+                );
+
+            } catch (error) {
+                console.error(`[Error Disparo] Falló el envío a ${cliente.telefono}:`, error);
+            }
+
+            await delay(3000);
+        }
+
+        console.log("--> Finalizó el proceso. Respondiendo a React (¡Acá desaparece el 'Enviando...')!");
+        res.json({ success: true, message: "Mensajes disparados correctamente" });
+    } catch (error) {
+        console.error("Error grave en el disparo manual:", error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+});
 server.listen(PORT, () => {
     connectToWhatsApp();
 });
