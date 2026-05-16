@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, theme, alternarTema }) {
   const [pass, setPass] = useState("");
 
   const handleSubmit = (e) => {
@@ -24,6 +24,13 @@ export default function Login({ onLogin }) {
         boxSizing: 'border-box'
       }}
     >
+      {/* BOTÓN FLOTANTE DE TEMA EN EL LOGIN */}
+      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10000 }}>
+        <button className="nav-control-btn" onClick={alternarTema}>
+          {theme === 'light' ? '🌙 Modo Oscuro' : '☀️ Modo Claro'}
+        </button>
+      </div>
+
       <div
         className="login-card"
         style={{
@@ -67,7 +74,6 @@ export default function Login({ onLogin }) {
         </form>
       </div>
 
-      {/* Footer del Login con tus redes */}
       <footer style={{ position: 'absolute', bottom: '25px', textAlign: 'center' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
           Desarrollado por <span style={{ fontWeight: '600', color: 'var(--text-title)' }}>AdrielJoshua</span>

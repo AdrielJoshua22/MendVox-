@@ -137,18 +137,34 @@ body {
 .menu-header-clean p { font-size: 1.1rem; color: var(--text-muted); margin: 8px 0 40px 0; }
 .grid-clean { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; width: 100%; }
 
+.grid-clean {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 35px; /* Más espacio entre ellas */
+  width: 100%;
+  max-width: 1200px; /* Agrandamos el contenedor de la grilla */
+  margin: 0 auto;
+}
+
 .card-clean {
   background: var(--bg-card);
-  border-radius: 16px;
-  padding: 35px 25px;
+  border-radius: 20px; /* Bordes un toque más suaves */
+  padding: 45px 30px; /* Aumentamos el padding interno para agrandar la tarjeta */
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   border: 1px solid var(--border-light);
-  box-shadow: 0 4px 20px var(--shadow-subtle);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 4px 25px var(--shadow-subtle);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
   cursor: pointer;
+  min-height: 320px; /* Forzamos una altura mínima robusta */
+}
+
+.card-clean:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 35px var(--shadow-subtle);
+  border-color: var(--hover-accent); /* Borde sutil del color del módulo al pasar el mouse */
 }
 .card-clean:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-subtle); }
 .card-clean h3 { font-size: 1.35rem; font-weight: 600; margin: 0 0 12px 0; color: var(--text-title); }

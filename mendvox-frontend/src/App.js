@@ -36,11 +36,15 @@ function App() {
     setVistaActiva('menu');
   };
 
-  if (!isLoggedIn) {
+if (!isLoggedIn) {
     return (
       <>
         <Toaster position="top-center" />
-        <Login onLogin={() => setIsLoggedIn(true)} />
+        <Login
+          onLogin={() => setIsLoggedIn(true)}
+          theme={theme}
+          alternarTema={alternarTema}
+        />
       </>
     );
   }
@@ -48,8 +52,6 @@ function App() {
   return (
     <div className="container" style={{ '--current-accent': obtenerColorAcento() }}>
       <Toaster position="top-right" />
-
-      {/* BARRA SUPERIOR DE CONTROL DE SESIÓN Y TEMA */}
       <div className="top-control-bar">
         <div className="top-bar-left">
           {vistaActiva !== 'menu' && (
@@ -68,8 +70,6 @@ function App() {
           </button>
         </div>
       </div>
-
-      {/* RENDERIZADO DINÁMICO DE MÓDULOS */}
       <div className="animate-fade-in" style={{ width: '100%', marginTop: '40px' }}>
         {vistaActiva === 'menu' && <MenuPrincipal setVista={setVistaActiva} />}
         {vistaActiva === 'audio' && <AudioMender />}
@@ -77,9 +77,18 @@ function App() {
         {vistaActiva === 'campana' && <GestorCampana />}
       </div>
 
-      <footer className="main-footer">
-        <p>MendVox Suite • Security Level: Administrator</p>
-      </footer>
+      <footer className="main-footer" style={{ marginTop: '50px', padding: '30px 0', width: '100%', textAlign: 'center', borderTop: '1px solid var(--border-light)' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                MendVox Suite • Security Level: Administrator
+              </p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '5px 0 0 0' }}>
+                Desarrollado por <span style={{ fontWeight: '600', color: 'var(--text-title)' }}>AdrielJoshua</span>
+              </p>
+              <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '10px' }}>
+                <a href="https://github.com/AdrielJoshua22" target="_blank" rel="noreferrer" style={{ color: 'var(--current-accent)', fontSize: '0.85rem', textDecoration: 'none', fontWeight: '500' }}>GitHub</a>
+                <a href="https://linkedin.com/in/joshuaadriel" target="_blank" rel="noreferrer" style={{ color: 'var(--current-accent)', fontSize: '0.85rem', textDecoration: 'none', fontWeight: '500' }}>LinkedIn</a>
+              </div>
+            </footer>
     </div>
   );
 }
