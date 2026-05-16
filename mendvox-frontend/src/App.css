@@ -1,364 +1,179 @@
 /* ==========================================
-   VARIABLES GLOBALES
+   PALETAS DE COLORES Y TEMAS MENDVOX
    ========================================== */
-:root {
-  --bg-color: #f9fafb;
-  --card-bg: #ffffff;
-  --text-main: #1f2937;
-  --text-sub: #6b7280;
-  --accent: #25D366; /* Color verde WhatsApp unificado */
-  --accent-hover: #20bd5a;
-  --border: #e5e7eb;
+.light-theme {
+  --bg-app: #f0f2f5;       /* Fondo WhatsApp Web claro */
+  --bg-card: #ffffff;
+  --text-title: #111b21;
+  --text-body: #3b3b3b;
+  --text-muted: #667781;
+  --border-light: #e9edef;
+  --shadow-subtle: rgba(11, 20, 26, 0.05);
+  --bg-input: #f8f9fa;
+}
+
+.dark-theme {
+  --bg-app: #0b141a;       /* Fondo oscuro profundo de WhatsApp */
+  --bg-card: #111b21;      /* Paneles oscuros */
+  --text-title: #e9edef;   /* Texto claro */
+  --text-body: #d1d7db;
+  --text-muted: #8696a0;
+  --border-light: #222e35; /* Bordes integrados oscuros */
+  --shadow-subtle: rgba(0, 0, 0, 0.3);
+  --bg-input: #202c33;     /* Cajas de texto oscuras */
 }
 
 /* ==========================================
-   RESET Y ESTRUCTURA BASE
+   RESET Y ESTRUCTURA GLOBAL
    ========================================== */
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-app) !important;
+  color: var(--text-title);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* El truco para centrar apps en React es aplicarlo al #root */
 #root {
   display: flex;
   justify-content: center;
   min-height: 100vh;
-  padding: 40px 20px;
   box-sizing: border-box;
 }
 
 .container {
   width: 100%;
-  max-width: 900px;
+  max-width: 1100px;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-nav {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 30px;
-  justify-content: center;
-  width: 100%;
-}
-
-.card {
-  width: 100%;
-  background: var(--card-bg);
-  padding: 40px;
-  border-radius: 24px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border);
-  box-sizing: border-box;
-  text-align: center;
-}
-
-/* ==========================================
-   TIPOGRAFÍA Y TEXTOS
-   ========================================== */
-.logo {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin: 0;
-  letter-spacing: -1px;
-  color: var(--text-main);
-}
-
-.subtitle {
-  color: var(--text-sub);
-  margin-top: 8px;
-  font-size: 1.1rem;
-}
-
-/* ==========================================
-   BOTONES
-   ========================================== */
-button {
-  cursor: pointer;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  font-size: 1rem;
-  transition: all 0.2s ease-in-out;
-}
-
-.mend-button {
-  padding: 14px 24px;
-  background-color: var(--accent);
-  color: white;
-}
-
-.mend-button:hover:not(:disabled) {
-  background-color: var(--accent-hover);
-  transform: translateY(-2px);
-}
-
-.mend-button:disabled {
-  background-color: #d1d5db;
-  cursor: not-allowed;
-}
-
-.secondary-button {
-  background-color: #ffffff;
-  border: 1px solid var(--border);
-  color: var(--text-sub);
-  padding: 14px 24px;
-}
-
-.secondary-button:hover {
-  background-color: #f3f4f6;
-  color: var(--text-main);
-  border-color: var(--text-sub);
-}
-
-/* ==========================================
-   INPUTS Y AUDIO (Limpiador)
-   ========================================== */
-.input-section {
-  margin-top: 32px;
-  display: flex;
-  flex-direction: column;
-}
-
-textarea {
-  width: 100%;
-  min-height: 120px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  font-size: 1rem;
-  resize: none;
-  box-sizing: border-box;
-  transition: border-color 0.2s;
-  outline: none;
-}
-
-textarea:focus {
-  border-color: var(--accent);
-}
-
-.audio-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.record-button {
-  background-color: var(--card-bg);
-  border: 2px solid var(--border);
-  color: var(--text-main);
-  padding: 10px 20px;
-}
-
-.record-button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.stop-button {
-  background-color: #fee2e2;
-  border: 2px solid #ef4444;
-  color: #ef4444;
-  padding: 10px 20px;
-}
-
-.audio-player {
-  height: 40px;
-  outline: none;
-}
-
-/* ==========================================
-   TABLA DE COBRANZAS (Dashboard)
-   ========================================== */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-}
-
-th {
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  font-weight: 600;
-  border-bottom: 2px solid var(--border);
-  padding: 12px;
-  text-align: left;
-}
-
-td {
-  border-bottom: 1px solid var(--border);
-  padding: 12px;
-  text-align: left;
-}
-
-/* ==========================================
-   UTILIDADES Y ANIMACIONES
-   ========================================== */
-.divider {
-  height: 1px;
-  background: var(--border);
-  margin: 32px 0;
-}
-
-.result-text {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: var(--text-main);
-  background: #eff6ff; /* Fondo azulito suave para resultados */
   padding: 20px;
-  border-radius: 12px;
-  text-align: left;
+  position: relative;
 }
 
-footer {
-  text-align: center;
-  margin-top: 24px;
-  font-size: 0.8rem;
-  color: var(--text-sub);
-}
-
-.timer-badge {
-  font-size: 0.85rem;
-  color: var(--text-sub);
-  margin-bottom: -20px;
-  margin-top: 10px;
-  font-family: monospace;
-  text-align: right;
-}
-
-/* Historial */
-.history-section {
-  margin-top: 40px;
-  text-align: left;
-  overflow: hidden;
-  animation: slideDown 0.3s ease-out;
-}
-
-.history-title {
-  font-size: 1.2rem;
-  color: var(--text-sub);
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.history-item {
-  background: #fdfdfd;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 15px;
-  margin-bottom: 12px;
-  transition: transform 0.2s;
-}
-
-.history-item:hover {
-  transform: translateX(5px);
-}
-
-.history-original {
-  font-size: 0.85rem;
-  color: var(--text-sub);
-  font-style: italic;
-  margin: 0 0 8px 0;
-}
-
-.history-repaired {
-  font-size: 0.95rem;
-  color: var(--text-main);
-  margin: 0;
-  font-weight: 500;
-}
-
-/* Animaciones */
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-pulse {
-  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .5; }
-}
-
-@keyframes slideDown {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 1000px; }
+/* Forzado dinámico de tarjetas limpias según el tema activo */
+.card, main {
+  background: var(--bg-card) !important;
+  color: var(--text-title) !important;
+  border-radius: 16px;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: 0 4px 20px var(--shadow-subtle);
+  padding: 30px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 /* ==========================================
-   VISTA DE CHAT (Burbujas estilo WhatsApp)
+   BARRA SUPERIOR DE CONTROL (NUEVO)
    ========================================== */
-.chat-header {
+.top-control-bar {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+  z-index: 101;
 }
 
-.chat-container {
+.top-bar-right {
+  display: flex;
+  gap: 10px;
+}
+
+.nav-control-btn {
+  background: var(--bg-card);
+  color: var(--text-title);
+  border: 1px solid var(--border-light);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 2px 5px var(--shadow-subtle);
+  transition: all 0.2s ease;
+}
+
+.nav-control-btn:hover {
+  background: var(--bg-input);
+  transform: translateY(-1px);
+}
+
+.logout-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* ==========================================
+   INTEGRACIÓN DEL COLOR DE ACENTO DINÁMICO
+   ========================================== */
+/* Los títulos principales ahora toman automáticamente el acento del módulo */
+.logo, h1.logo {
+  color: var(--current-accent) !important;
+  transition: color 0.3s ease;
+}
+
+/* El botón principal muta su color de fondo al del acento actual */
+.mend-button {
+  background-color: var(--current-accent) !important;
+  color: #ffffff !important;
+  border: none;
+  font-weight: 600;
+  transition: filter 0.2s ease;
+}
+
+.mend-button:hover:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+/* ==========================================
+   ESTILOS DE ENTRADAS, MENÚS Y TABLAS
+   ========================================== */
+.menu-clean-container { width: 100%; text-align: center; }
+.menu-header-clean h2 { font-size: 2.2rem; font-weight: 700; margin: 0; color: var(--text-title); }
+.menu-header-clean p { font-size: 1.1rem; color: var(--text-muted); margin: 8px 0 40px 0; }
+.grid-clean { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; width: 100%; }
+
+.card-clean {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 35px 25px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 450px;
-  overflow-y: auto;
-  padding: 20px;
-  background-color: #efeae2; /* El fondo clásico de WhatsApp */
-  border-radius: 16px;
-  border: 1px solid var(--border);
-}
-
-.burbuja {
-  max-width: 75%;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  position: relative;
-  text-align: left;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.burbuja.bot {
-  align-self: flex-end;
-  background-color: #d9fdd3; /* Verde clarito de los mensajes enviados */
-  border-top-right-radius: 2px;
-}
-
-.burbuja.cliente {
-  align-self: flex-start;
-  background-color: #ffffff;
-  border-top-left-radius: 2px;
-}
-
-.fecha-chat {
-  display: block;
-  font-size: 0.7rem;
-  color: #667781;
-  text-align: right;
-  margin-top: 5px;
-}
-
-/* Para que las filas de la tabla parezcan clickeables */
-.fila-clickeable {
+  align-items: center;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 20px var(--shadow-subtle);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
-.fila-clickeable:hover {
-  background-color: #f8f9fa;
+.card-clean:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-subtle); }
+.card-clean h3 { font-size: 1.35rem; font-weight: 600; margin: 0 0 12px 0; color: var(--text-title); }
+.card-clean p { font-size: 0.95rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 25px 0; flex-grow: 1; }
+.card-clean-icon { width: 65px; height: 65px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 20px; }
+
+/* Inputs y Textareas */
+textarea, input[type="file"] {
+  background-color: var(--bg-input) !important;
+  color: var(--text-title) !important;
+  border: 1px solid var(--border-light) !important;
 }
+
+/* Tablas de Datos del Dashboard */
+table { width: 100%; border-collapse: collapse; margin-top: 20px; color: var(--text-title); }
+th { background-color: var(--bg-input); color: var(--text-muted); font-weight: 600; border-bottom: 2px solid var(--border-light); padding: 12px; font-size: 0.8rem; text-transform: uppercase; }
+td { border-bottom: 1px solid var(--border-light); padding: 14px 12px; color: var(--text-body); font-size: 0.95rem; }
+.fila-clickeable:hover { background-color: var(--bg-input) !important; }
+
+/* Utilidades de Historial y Footer */
+.history-item { background: var(--bg-input) !important; border: 1px solid var(--border-light) !important; }
+.main-footer { marginTop: 40px; padding: 20px 0; opacity: 0.6; width: 100%; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+.divider { height: 1px; background: var(--border-light); margin: 20px 0; }
+.result-text { background: var(--bg-app) !important; color: var(--text-title) !important; }
+
+/* Animación básica */
+.animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

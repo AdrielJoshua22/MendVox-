@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 export default function WhatsAppDashboard() {
   const [clientes, setClientes] = useState([]);
@@ -59,17 +60,19 @@ export default function WhatsAppDashboard() {
     );
   };
 
-  const dispararMensajes = async () => {
+const dispararMensajes = async () => {
     setDisparando(true);
+    const cargandoToast = toast.loading("Disparando mensajes a la cola... ");
+
     try {
       await axios.post('http://localhost:3000/api/campana/disparar', { telefonos: seleccionados });
-      alert("¡Mensajes disparados a la cola con éxito! 🚀");
+      toast.success("¡Mensajes enviados correctamente!", { id: cargandoToast });
       setSeleccionados([]);
       cargarClientes();
       cargarMetricas();
     } catch (error) {
       console.error(error);
-      alert("Error al disparar los mensajes.");
+      toast.error("Error al disparar los mensajes.", { id: cargandoToast });
     }
     setDisparando(false);
   };
@@ -83,11 +86,9 @@ export default function WhatsAppDashboard() {
 
       <section className="input-section" style={{ marginTop: '20px' }}>
 
-        {/* VISTA 1: DASHBOARD PRINCIPAL */}
         {!clienteActivo && (
           <div className="animate-fade-in">
 
-            {/* NUEVO: PANEL DE KPIs */}
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
                 <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                     <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Deuda Total en Gestión</h4>
@@ -103,7 +104,6 @@ export default function WhatsAppDashboard() {
                 </div>
             </div>
 
-            {/* PANEL DE ACCIÓN MULTIPLE */}
             {seleccionados.length > 0 && (
               <div style={{
                 backgroundColor: '#e8f5e9', border: '1px solid #25D366', padding: '15px',
@@ -123,7 +123,6 @@ export default function WhatsAppDashboard() {
               </div>
             )}
 
-            {/* TABLA DE DEUDORES */}
             <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '10px' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #ddd' }}>
