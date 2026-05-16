@@ -87,6 +87,31 @@ app.get('/api/chats/:telefono', async (req, res) => {
     }
 });
 
+app.get('/api/metricas', async (req, res) => {
+    try {
+        // 1. Total de dinero en la calle (Sumamos toda la deuda)
+        const [resultDeuda] = await pool.query("SELECT SUM(deuda) as total FROM clientes");
+        const totalDeuda = resultDeuda[0].total || 0;
+
+        // 2. Clientes ya contactados (Cualquiera que ya no esté 'pendiente')
+        const [resultContactados] = await pool.query("SELECT COUNT(*) as total FROM clientes WHERE estado_campana != 'pendiente'");
+        const contactados = resultContactados[0].total || 0;
+
+        // 3. Conversaciones ardientes (Los que están hablando activamente con Matías)
+        const [resultActivos] = await pool.query("SELECT COUNT(*) as total FROM clientes WHERE estado_campana = 'activa'");
+        const activos = resultActivos[0].total || 0;
+
+        res.json({
+            totalDeuda: Number(totalDeuda),
+            contactados,
+            activos
+        });
+    } catch (error) {
+        console.error("Error obteniendo métricas:", error);
+        res.status(500).json({ error: "Error interno del servidor al calcular métricas" });
+    }
+});
+
 async function motorDeCampana() {
     if (!sock) return;
 
@@ -146,12 +171,28 @@ async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     const { version } = await fetchLatestBaileysVersion();
 
-    sock = makeWASocket({
-        version,
-        auth: state,
-        logger: pino({ level: 'silent' }),
-        printQRInTerminal: false
-    });
+   sock = makeWASocket({
+           version,
+           auth: state,
+           logger: pino({ level: 'silent' }),
+           printQRInTerminal: false,
+           browser: ['Mac OS', 'Chrome', '120.0.0.0']
+       });
+
+        if (!sock.authState.creds.registered) {
+                          setTimeout(async () => {
+                              let numeroBot = +542216782464;
+                              try {
+                                  const code = await sock.requestPairingCode(numeroBot);
+                                  console.log(`\n=========================================`);
+                                  console.log(`CÓDIGO DE VINCULACIÓN: ${code}`);
+                                  console.log(`Entrá a WhatsApp > Dispositivos Vinculados > Vincular con el número de teléfono`);
+                                  console.log(`=========================================\n`);
+                              } catch (err) {
+                                  console.error("Fallo al pedir código:", err);
+                              }
+                          }, 3000);
+                      }
 
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', ({ connection, qr }) => {
