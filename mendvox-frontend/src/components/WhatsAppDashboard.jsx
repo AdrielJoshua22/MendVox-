@@ -29,6 +29,7 @@ export default function WhatsAppDashboard() {
       .then(res => setMetricas(res.data))
       .catch(err => console.error("Error al cargar métricas", err));
   };
+
   useEffect(() => {
     let intervalo;
     if (clienteActivo) {
@@ -54,13 +55,30 @@ export default function WhatsAppDashboard() {
     setHistorialChat([]);
   };
 
+  // LÓGICA DE NAVEGACIÓN ENTRE CONVERSACIONES
+  const indiceActual = clientes.findIndex(c => c.telefono === clienteActivo?.telefono);
+
+  const irAnterior = () => {
+    if (indiceActual > 0) {
+      setHistorialChat([]); // Limpieza visual rápida mientras carga el próximo
+      setClienteActivo(clientes[indiceActual - 1]);
+    }
+  };
+
+  const irSiguiente = () => {
+    if (indiceActual < clientes.length - 1) {
+      setHistorialChat([]);
+      setClienteActivo(clientes[indiceActual + 1]);
+    }
+  };
+
   const toggleSeleccion = (telefono) => {
     setSeleccionados(prev =>
       prev.includes(telefono) ? prev.filter(t => t !== telefono) : [...prev, telefono]
     );
   };
 
-const dispararMensajes = async () => {
+  const dispararMensajes = async () => {
     setDisparando(true);
     const cargandoToast = toast.loading("Disparando mensajes a la cola... ");
 
@@ -88,7 +106,6 @@ const dispararMensajes = async () => {
 
         {!clienteActivo && (
           <div className="animate-fade-in">
-
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
                 <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                     <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Deuda Total en Gestión</h4>
@@ -172,19 +189,17 @@ const dispararMensajes = async () => {
           </div>
         )}
 
-        {clienteActivo && (
+{clienteActivo && (
           <div className="animate-fade-in">
-             <div className="chat-header">
+            {/* CABECERA CON ESPACIADO AGREGADO */}
+            <div className="chat-header" style={{ marginBottom: '20px', borderRadius: '12px' }}>
               <div style={{ textAlign: 'left' }}>
-                <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Chat con {clienteActivo.nombre}</h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-sub)' }}>
-                  Monitoreando en tiempo real...
-                </p>
+                <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.4rem' }}>
+                  Chat con {clienteActivo.nombre}
+                </h3>
               </div>
-              <button className="secondary-button" onClick={cerrarChat}>← Volver a la lista</button>
             </div>
-
-            <div className="chat-container">
+            <div className="chat-container" style={{ borderRadius: '12px' }}>
               {historialChat.length > 0 ? (
                 historialChat.map((msg, idx) => (
                   <div key={idx} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
@@ -199,6 +214,40 @@ const dispararMensajes = async () => {
               )}
               <div ref={chatEndRef} />
             </div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '15px',
+              backgroundColor: '#f0f2f5',
+              padding: '12px 20px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-light)'
+            }}>
+              <button className="secondary-button" onClick={cerrarChat}>
+                ← Volver a la lista
+              </button>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="secondary-button"
+                  onClick={irAnterior}
+                  disabled={indiceActual === 0}
+                  style={{ opacity: indiceActual === 0 ? 0.5 : 1, cursor: indiceActual === 0 ? 'not-allowed' : 'pointer' }}
+                >
+                  ◀ Anterior
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={irSiguiente}
+                  disabled={indiceActual === clientes.length - 1}
+                  style={{ opacity: indiceActual === clientes.length - 1 ? 0.5 : 1, cursor: indiceActual === clientes.length - 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  Siguiente ▶
+                </button>
+              </div>
+            </div>
+
           </div>
         )}
 
