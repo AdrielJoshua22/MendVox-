@@ -132,8 +132,6 @@ app.post('/api/campana/disparar', async (req, res) => {
 
         for (const cliente of clientes) {
             if (!isSocketConnected) break;
-            if (cliente.estado_campana === 'activa') continue;
-
             await procesarEnvioCampana(cliente);
             await delay(3000);
         }
