@@ -155,15 +155,14 @@ export default function WhatsAppDashboard() {
                   clientes.map(c => (
                     <tr key={c.telefono} className="fila-clickeable" onClick={() => abrirChat(c)}>
                       <td style={{ padding: '10px' }}>
-                        {c.estado_campana !== 'activa' && (
-                          <input
-                            type="checkbox"
-                            checked={seleccionados.includes(c.telefono)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSeleccion(c.telefono)}
-                            style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                          />
-                        )}
+                        {/* ❌ SE QUITÓ LA CONDICIÓN. AHORA SIEMPRE SE MUESTRA EL CHECKBOX */}
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.includes(c.telefono)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSeleccion(c.telefono)}
+                          style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                        />
                       </td>
                       <td style={{ padding: '10px' }}>{c.nombre}</td>
                       <td style={{ padding: '10px' }}>{c.telefono}</td>
@@ -189,7 +188,7 @@ export default function WhatsAppDashboard() {
           </div>
         )}
 
-{clienteActivo && (
+        {clienteActivo && (
           <div className="animate-fade-in">
             {/* CABECERA CON ESPACIADO AGREGADO */}
             <div className="chat-header" style={{ marginBottom: '20px', borderRadius: '12px' }}>
