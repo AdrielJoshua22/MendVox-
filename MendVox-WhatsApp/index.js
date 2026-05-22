@@ -32,14 +32,26 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 const preferenciasChat = new Map();
 const mensajesGeneradosPorIA = new Set();
 const sesionesIA = new Map();
+// NUEVO: Para saber a quién le estás escribiendo a mano y callar al bot
+const humanosAlMando = new Set();
+
 const server = http.createServer(app);
 const upload = multer({ dest: 'uploads/' });
 
 let sock;
 let isSocketConnected = false;
+
+const promesaConTimeout = (promesa, ms) => {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Timeout de WhatsApp excedido (Claves trabadas)')), ms);
+    });
+    return Promise.race([promesa, timeout]).finally(() => clearTimeout(timer));
+};
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -48,14 +60,15 @@ async function procesarEnvioCampana(cliente) {
     const mensajeInicial = `Hola ${cliente.nombre}, soy Joshua del área de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
 
     try {
-        await sock.sendMessage(numeroFormateado, { text: mensajeInicial });
+        await promesaConTimeout(sock.sendMessage(numeroFormateado, { text: mensajeInicial }), 10000);
+
         mensajesGeneradosPorIA.add(mensajeInicial);
         await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)", [cliente.telefono, mensajeInicial]);
         await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [cliente.telefono]);
         console.log(`Mensaje enviado a ${cliente.nombre}`);
         return true;
     } catch (error) {
-        console.error(`Fallo envio a ${cliente.telefono}:`, error.message);
+        console.error(` Fallo envio a ${cliente.telefono}:`, error.message);
         return false;
     }
 }
@@ -141,26 +154,29 @@ app.post('/api/campana/disparar', async (req, res) => {
     }
 });
 
-async function motorDeCampana() {
-    if (!sock || !isSocketConnected) return;
+app.post('/api/chats/enviar', async (req, res) => {
+    if (!sock || !isSocketConnected) return res.status(500).json({ error: "WhatsApp desconectado" });
+
+    const { telefono, mensaje } = req.body;
+    if (!telefono || !mensaje) return res.status(400).json({ error: "Faltan datos" });
+
+    const numeroFormateado = `${telefono}@s.whatsapp.net`;
 
     try {
-        await pool.query("UPDATE clientes SET estado_campana = 'pausada' WHERE estado_campana = 'activa' AND ultima_interaccion < NOW() - INTERVAL 10 MINUTE");
-        const [activos] = await pool.query("SELECT COUNT(*) as total FROM clientes WHERE estado_campana = 'activa'");
-        const cupos = 10 - activos[0].total;
+        await sock.sendMessage(numeroFormateado, { text: mensaje });
+        humanosAlMando.add(numeroFormateado);
+        await pool.query(
+            "INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)",
+            [telefono, mensaje]
+        );
 
-        if (cupos > 0) {
-            const [pendientes] = await pool.query("SELECT * FROM clientes WHERE estado_campana = 'pendiente' LIMIT ?", [cupos]);
-            for (const cliente of pendientes) {
-                if (!isSocketConnected) break;
-                await delay(Math.floor(Math.random() * 16000) + 12000);
-                await procesarEnvioCampana(cliente);
-            }
-        }
+        console.log(`[Toma de Control] Escribiste manualmente a ${telefono}`);
+        res.json({ success: true });
     } catch (error) {
-        console.error(error);
+        console.error("Error enviando mensaje manual:", error);
+        res.status(500).json({ error: "Error enviando el mensaje" });
     }
-}
+});
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -237,6 +253,11 @@ async function connectToWhatsApp() {
 
             await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroDB]);
             await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)", [numeroDB, userInput]);
+
+            if (humanosAlMando.has(from)) {
+                console.log(`[Silencio] IA ignorando el mensaje de ${cliente.nombre} porque tomaste el control.`);
+                return;
+            }
 
             if (!preferenciasChat.has(from)) preferenciasChat.set(from, 'TEXTO');
             const estadoActual = preferenciasChat.get(from);
