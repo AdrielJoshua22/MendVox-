@@ -9,6 +9,7 @@ export default function WhatsAppDashboard() {
   const [seleccionados, setSeleccionados] = useState([]);
   const [disparando, setDisparando] = useState(false);
   const [metricas, setMetricas] = useState({ totalDeuda: 0, contactados: 0, activos: 0 });
+  const [mensajeManual, setMensajeManual] = useState(""); // <-- NUEVO ESTADO
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -53,14 +54,15 @@ export default function WhatsAppDashboard() {
   const cerrarChat = () => {
     setClienteActivo(null);
     setHistorialChat([]);
+    setMensajeManual("");
   };
 
-  // LÓGICA DE NAVEGACIÓN ENTRE CONVERSACIONES
   const indiceActual = clientes.findIndex(c => c.telefono === clienteActivo?.telefono);
 
   const irAnterior = () => {
     if (indiceActual > 0) {
-      setHistorialChat([]); // Limpieza visual rápida mientras carga el próximo
+      setHistorialChat([]);
+      setMensajeManual("");
       setClienteActivo(clientes[indiceActual - 1]);
     }
   };
@@ -68,6 +70,7 @@ export default function WhatsAppDashboard() {
   const irSiguiente = () => {
     if (indiceActual < clientes.length - 1) {
       setHistorialChat([]);
+      setMensajeManual("");
       setClienteActivo(clientes[indiceActual + 1]);
     }
   };
@@ -89,10 +92,28 @@ export default function WhatsAppDashboard() {
       cargarClientes();
       cargarMetricas();
     } catch (error) {
-      console.error(error);
       toast.error("Error al disparar los mensajes.", { id: cargandoToast });
     }
     setDisparando(false);
+  };
+
+  const enviarMensajeEnVivo = async (e) => {
+    e.preventDefault();
+    if (!mensajeManual.trim() || !clienteActivo) return;
+
+    const textoGuardado = mensajeManual;
+    setMensajeManual("");
+
+    try {
+      await axios.post('http://localhost:3000/api/chats/enviar', {
+        telefono: clienteActivo.telefono,
+        mensaje: textoGuardado
+      });
+      setHistorialChat(prev => [...prev, { remitente: 'bot', mensaje: textoGuardado, fecha: new Date() }]);
+    } catch (error) {
+      toast.error("Fallo al enviar tu mensaje.");
+      setMensajeManual(textoGuardado);
+    }
   };
 
   return (
@@ -106,6 +127,7 @@ export default function WhatsAppDashboard() {
 
         {!clienteActivo && (
           <div className="animate-fade-in">
+            {/* ... TUS MÉTRICAS Y TABLA DE CLIENTES (Idéntico a antes) ... */}
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
                 <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                     <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Deuda Total en Gestión</h4>
@@ -130,11 +152,7 @@ export default function WhatsAppDashboard() {
                 <span style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                   {seleccionados.length} cliente(s) seleccionado(s)
                 </span>
-                <button
-                  className="mend-button"
-                  onClick={dispararMensajes}
-                  disabled={disparando}
-                >
+                <button className="mend-button" onClick={dispararMensajes} disabled={disparando}>
                   {disparando ? "Enviando..." : "Disparar Mensajes 🚀"}
                 </button>
               </div>
@@ -155,7 +173,6 @@ export default function WhatsAppDashboard() {
                   clientes.map(c => (
                     <tr key={c.telefono} className="fila-clickeable" onClick={() => abrirChat(c)}>
                       <td style={{ padding: '10px' }}>
-                        {/* ❌ SE QUITÓ LA CONDICIÓN. AHORA SIEMPRE SE MUESTRA EL CHECKBOX */}
                         <input
                           type="checkbox"
                           checked={seleccionados.includes(c.telefono)}
@@ -179,9 +196,7 @@ export default function WhatsAppDashboard() {
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay deudores cargados.</td>
-                  </tr>
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay deudores cargados.</td></tr>
                 )}
               </tbody>
             </table>
@@ -190,7 +205,6 @@ export default function WhatsAppDashboard() {
 
         {clienteActivo && (
           <div className="animate-fade-in">
-            {/* CABECERA CON ESPACIADO AGREGADO */}
             <div className="chat-header" style={{ marginBottom: '20px', borderRadius: '12px' }}>
               <div style={{ textAlign: 'left' }}>
                 <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.4rem' }}>
@@ -198,7 +212,8 @@ export default function WhatsAppDashboard() {
                 </h3>
               </div>
             </div>
-            <div className="chat-container" style={{ borderRadius: '12px' }}>
+
+            <div className="chat-container" style={{ borderRadius: '12px 12px 0 0', height: '400px' }}>
               {historialChat.length > 0 ? (
                 historialChat.map((msg, idx) => (
                   <div key={idx} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
@@ -213,33 +228,54 @@ export default function WhatsAppDashboard() {
               )}
               <div ref={chatEndRef} />
             </div>
-            <div style={{
+            <form onSubmit={enviarMensajeEnVivo} style={{
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: '15px',
+              gap: '10px',
+              padding: '15px',
               backgroundColor: '#f0f2f5',
-              padding: '12px 20px',
-              borderRadius: '12px',
-              border: '1px solid var(--border-light)'
+              borderLeft: '1px solid var(--border-light)',
+              borderRight: '1px solid var(--border-light)'
             }}>
-              <button className="secondary-button" onClick={cerrarChat}>
-                ← Volver a la lista
+              <input
+                type="text"
+                value={mensajeManual}
+                onChange={(e) => setMensajeManual(e.target.value)}
+                placeholder="Escribí un mensaje y tomá el control del chat..."
+                style={{
+                  flex: 1, padding: '12px 15px', borderRadius: '24px',
+                  border: 'none', outline: 'none', fontSize: '0.95rem'
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!mensajeManual.trim()}
+                style={{
+                  backgroundColor: mensajeManual.trim() ? '#25D366' : '#a8e5b6',
+                  color: 'white', border: 'none', borderRadius: '50%',
+                  width: '45px', height: '45px', cursor: mensajeManual.trim() ? 'pointer' : 'default',
+                  display: 'flex', justifyContent: 'center', alignItems: 'center'
+                }}
+              >
+                ➤
               </button>
+            </form>
+
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              backgroundColor: '#f0f2f5', padding: '12px 20px', borderRadius: '0 0 12px 12px',
+              border: '1px solid var(--border-light)', borderTop: 'none'
+            }}>
+              <button className="secondary-button" onClick={cerrarChat}>← Volver a la lista</button>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
-                  className="secondary-button"
-                  onClick={irAnterior}
-                  disabled={indiceActual === 0}
+                  className="secondary-button" onClick={irAnterior} disabled={indiceActual === 0}
                   style={{ opacity: indiceActual === 0 ? 0.5 : 1, cursor: indiceActual === 0 ? 'not-allowed' : 'pointer' }}
                 >
                   ◀ Anterior
                 </button>
                 <button
-                  className="secondary-button"
-                  onClick={irSiguiente}
-                  disabled={indiceActual === clientes.length - 1}
+                  className="secondary-button" onClick={irSiguiente} disabled={indiceActual === clientes.length - 1}
                   style={{ opacity: indiceActual === clientes.length - 1 ? 0.5 : 1, cursor: indiceActual === clientes.length - 1 ? 'not-allowed' : 'pointer' }}
                 >
                   Siguiente ▶
