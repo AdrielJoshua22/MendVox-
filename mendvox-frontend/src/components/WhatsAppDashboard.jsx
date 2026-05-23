@@ -9,7 +9,7 @@ export default function WhatsAppDashboard() {
   const [seleccionados, setSeleccionados] = useState([]);
   const [disparando, setDisparando] = useState(false);
   const [metricas, setMetricas] = useState({ totalDeuda: 0, contactados: 0, activos: 0 });
-  const [mensajeManual, setMensajeManual] = useState(""); // <-- NUEVO ESTADO
+  const [mensajeManual, setMensajeManual] = useState("");
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -116,6 +116,26 @@ export default function WhatsAppDashboard() {
     }
   };
 
+  // <-- NUEVA FUNCIÓN PARA BORRAR LA LISTA -->
+  const borrarListaCompleta = async () => {
+    const confirmado = window.confirm("⚠️ ¿Estás seguro de que querés borrar TODA la lista de clientes y el historial de chats? Esta acción no se puede deshacer.");
+    if (!confirmado) return;
+
+    const toastId = toast.loading("Borrando base de datos...");
+    try {
+      await axios.delete('http://localhost:3000/api/campana/borrar');
+      toast.success("Lista reseteada a cero.", { id: toastId });
+
+      // Limpiamos la pantalla
+      setClientes([]);
+      setSeleccionados([]);
+      cargarMetricas();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al borrar la base de datos.", { id: toastId });
+    }
+  };
+
   return (
     <main className="card" style={{ maxWidth: '900px' }}>
       <header>
@@ -127,7 +147,6 @@ export default function WhatsAppDashboard() {
 
         {!clienteActivo && (
           <div className="animate-fade-in">
-            {/* ... TUS MÉTRICAS Y TABLA DE CLIENTES (Idéntico a antes) ... */}
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
                 <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                     <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Deuda Total en Gestión</h4>
@@ -158,7 +177,23 @@ export default function WhatsAppDashboard() {
               </div>
             )}
 
-            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '10px' }}>
+            {/* <-- CONTENEDOR NUEVO: Título y botón de borrar juntos --> */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', marginBottom: '10px' }}>
+              <h3 style={{ margin: 0, color: '#111b21', fontSize: '1.2rem' }}>Lista de Deudores</h3>
+              {clientes.length > 0 && (
+                <button
+                  onClick={borrarListaCompleta}
+                  style={{
+                    backgroundColor: 'transparent', color: '#d32f2f', border: '1px solid #d32f2f',
+                    padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem'
+                  }}
+                >
+                  🗑️ Borrar Lista
+                </button>
+              )}
+            </div>
+
+            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #ddd' }}>
                   <th style={{ padding: '10px', width: '40px' }}></th>
@@ -196,7 +231,7 @@ export default function WhatsAppDashboard() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay deudores cargados.</td></tr>
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#667781' }}>No hay deudores cargados. Subí un Excel para arrancar.</td></tr>
                 )}
               </tbody>
             </table>
@@ -228,13 +263,10 @@ export default function WhatsAppDashboard() {
               )}
               <div ref={chatEndRef} />
             </div>
+
             <form onSubmit={enviarMensajeEnVivo} style={{
-              display: 'flex',
-              gap: '10px',
-              padding: '15px',
-              backgroundColor: '#f0f2f5',
-              borderLeft: '1px solid var(--border-light)',
-              borderRight: '1px solid var(--border-light)'
+              display: 'flex', gap: '10px', padding: '15px', backgroundColor: '#f0f2f5',
+              borderLeft: '1px solid var(--border-light)', borderRight: '1px solid var(--border-light)'
             }}>
               <input
                 type="text"
@@ -282,7 +314,6 @@ export default function WhatsAppDashboard() {
                 </button>
               </div>
             </div>
-
           </div>
         )}
 
