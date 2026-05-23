@@ -178,6 +178,19 @@ app.post('/api/chats/enviar', async (req, res) => {
     }
 });
 
+app.delete('/api/campana/borrar', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM historial_chats");
+        await pool.query("DELETE FROM clientes");
+
+        console.log("Base de datos limpiada por el administrador.");
+        res.json({ success: true, message: "Base de datos reseteada correctamente." });
+    } catch (error) {
+        console.error("Error al borrar la base de datos:", error);
+        res.status(500).json({ error: "Error interno al borrar" });
+    }
+});
+
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     const { version } = await fetchLatestBaileysVersion();
