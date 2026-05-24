@@ -10,313 +10,193 @@ export default function WhatsAppDashboard() {
   const [disparando, setDisparando] = useState(false);
   const [metricas, setMetricas] = useState({ totalDeuda: 0, contactados: 0, activos: 0 });
   const [mensajeManual, setMensajeManual] = useState("");
+  const [modoMonitor, setModoMonitor] = useState(false);
+  const [chatsMultiples, setChatsMultiples] = useState({});
+  const [mensajesRapidos, setMensajesRapidos] = useState({});
   const chatEndRef = useRef(null);
 
   useEffect(() => {
-    if (!clienteActivo) {
-      cargarClientes();
-      cargarMetricas();
-    }
-  }, [clienteActivo]);
+    cargarClientes();
+    cargarMetricas();
+  }, []);
 
   const cargarClientes = () => {
     axios.get('http://localhost:3000/api/clientes')
       .then(res => setClientes(res.data))
-      .catch(err => console.error("Error al cargar deudores", err));
+      .catch(err => console.error(err));
   };
 
   const cargarMetricas = () => {
     axios.get('http://localhost:3000/api/metricas')
       .then(res => setMetricas(res.data))
-      .catch(err => console.error("Error al cargar métricas", err));
+      .catch(err => console.error(err));
   };
 
   useEffect(() => {
     let intervalo;
-    if (clienteActivo) {
+    if (clienteActivo && !modoMonitor) {
       const buscarMensajes = () => {
         axios.get(`http://localhost:3000/api/chats/${clienteActivo.telefono}`)
           .then(res => setHistorialChat(res.data))
-          .catch(err => console.error("Error al recargar el chat", err));
+          .catch(err => console.error(err));
       };
       buscarMensajes();
       intervalo = setInterval(buscarMensajes, 3000);
     }
     return () => clearInterval(intervalo);
-  }, [clienteActivo]);
+  }, [clienteActivo, modoMonitor]);
 
   useEffect(() => {
-    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [historialChat]);
-
-  const abrirChat = (cliente) => setClienteActivo(cliente);
-
-  const cerrarChat = () => {
-    setClienteActivo(null);
-    setHistorialChat([]);
-    setMensajeManual("");
-  };
-
-  const indiceActual = clientes.findIndex(c => c.telefono === clienteActivo?.telefono);
-
-  const irAnterior = () => {
-    if (indiceActual > 0) {
-      setHistorialChat([]);
-      setMensajeManual("");
-      setClienteActivo(clientes[indiceActual - 1]);
+    let intervalo;
+    if (modoMonitor && seleccionados.length > 0) {
+      const buscarMultiplesChats = async () => {
+        try {
+          const promesas = seleccionados.map(t => axios.get(`http://localhost:3000/api/chats/${t}`));
+          const resultados = await Promise.all(promesas);
+          const nuevosChats = {};
+          resultados.forEach((res, i) => nuevosChats[seleccionados[i]] = res.data);
+          setChatsMultiples(nuevosChats);
+        } catch (e) { console.error(e); }
+      };
+      buscarMultiplesChats();
+      intervalo = setInterval(buscarMultiplesChats, 3000);
     }
-  };
+    return () => clearInterval(intervalo);
+  }, [modoMonitor, seleccionados]);
 
-  const irSiguiente = () => {
-    if (indiceActual < clientes.length - 1) {
-      setHistorialChat([]);
-      setMensajeManual("");
-      setClienteActivo(clientes[indiceActual + 1]);
-    }
-  };
+  const abrirChat = (cliente) => { setClienteActivo(cliente); setModoMonitor(false); };
+  const cerrarChat = () => { setClienteActivo(null); setHistorialChat([]); setMensajeManual(""); };
+  const cerrarMonitor = () => { setModoMonitor(false); setChatsMultiples({}); };
 
   const toggleSeleccion = (telefono) => {
-    setSeleccionados(prev =>
-      prev.includes(telefono) ? prev.filter(t => t !== telefono) : [...prev, telefono]
-    );
+    setSeleccionados(prev => prev.includes(telefono) ? prev.filter(t => t !== telefono) : [...prev, telefono]);
   };
 
   const dispararMensajes = async () => {
     setDisparando(true);
-    const cargandoToast = toast.loading("Disparando mensajes a la cola... ");
-
+    const id = toast.loading("Enviando...");
     try {
       await axios.post('http://localhost:3000/api/campana/disparar', { telefonos: seleccionados });
-      toast.success("¡Mensajes enviados correctamente!", { id: cargandoToast });
+      toast.success("Enviado", { id });
       setSeleccionados([]);
       cargarClientes();
       cargarMetricas();
-    } catch (error) {
-      toast.error("Error al disparar los mensajes.", { id: cargandoToast });
-    }
+    } catch (e) { toast.error("Error", { id }); }
     setDisparando(false);
   };
 
-  const enviarMensajeEnVivo = async (e) => {
+  const enviarMensajeIndividual = async (e) => {
     e.preventDefault();
     if (!mensajeManual.trim() || !clienteActivo) return;
-
-    const textoGuardado = mensajeManual;
+    const texto = mensajeManual;
     setMensajeManual("");
-
     try {
-      await axios.post('http://localhost:3000/api/chats/enviar', {
-        telefono: clienteActivo.telefono,
-        mensaje: textoGuardado
-      });
-      setHistorialChat(prev => [...prev, { remitente: 'bot', mensaje: textoGuardado, fecha: new Date() }]);
-    } catch (error) {
-      toast.error("Fallo al enviar tu mensaje.");
-      setMensajeManual(textoGuardado);
-    }
+      await axios.post('http://localhost:3000/api/chats/enviar', { telefono: clienteActivo.telefono, mensaje: texto });
+      setHistorialChat(prev => [...prev, { remitente: 'bot', mensaje: texto, fecha: new Date() }]);
+    } catch (e) { toast.error("Error"); setMensajeManual(texto); }
   };
 
-  // <-- NUEVA FUNCIÓN PARA BORRAR LA LISTA -->
-  const borrarListaCompleta = async () => {
-    const confirmado = window.confirm("⚠️ ¿Estás seguro de que querés borrar TODA la lista de clientes y el historial de chats? Esta acción no se puede deshacer.");
-    if (!confirmado) return;
-
-    const toastId = toast.loading("Borrando base de datos...");
+  const enviarMensajeMonitor = async (telefono) => {
+    const texto = mensajesRapidos[telefono];
+    if (!texto || !texto.trim()) return;
     try {
-      await axios.delete('http://localhost:3000/api/campana/borrar');
-      toast.success("Lista reseteada a cero.", { id: toastId });
-
-      // Limpiamos la pantalla
-      setClientes([]);
-      setSeleccionados([]);
-      cargarMetricas();
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al borrar la base de datos.", { id: toastId });
-    }
+      await axios.post('http://localhost:3000/api/chats/enviar', { telefono, mensaje: texto });
+      setMensajesRapidos(prev => ({ ...prev, [telefono]: "" }));
+    } catch (e) { toast.error("Error"); }
   };
 
   return (
-    <main className="card" style={{ maxWidth: '900px' }}>
+    <main className="card" style={{ maxWidth: modoMonitor ? '1200px' : '900px' }}>
       <header>
         <h1 className="logo" style={{ color: '#25D366' }}>MendVox Cobranzas</h1>
         <p className="subtitle">Gestión automatizada por WhatsApp</p>
       </header>
 
-      <section className="input-section" style={{ marginTop: '20px' }}>
+      {/* METRICAS SIEMPRE VISIBLES */}
+      <section style={{ display: 'flex', gap: '15px', marginBottom: '20px', marginTop: '20px' }}>
+        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
+          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
+          <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
+        </div>
+        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
+          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
+          <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
+        </div>
+      </section>
 
-        {!clienteActivo && (
+      <section className="input-section">
+        {!clienteActivo && !modoMonitor && (
           <div className="animate-fade-in">
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Deuda Total en Gestión</h4>
-                    <h2 style={{ margin: 0, color: '#111b21' }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
-                </div>
-                <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Clientes Contactados</h4>
-                    <h2 style={{ margin: 0, color: '#111b21' }}>{metricas.contactados}</h2>
-                </div>
-                <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #FF9F43', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#667781', fontSize: '0.9rem' }}>Chats Activos (Bot)</h4>
-                    <h2 style={{ margin: 0, color: '#111b21' }}>{metricas.activos} <span style={{fontSize: '1rem', color: '#667781'}}>/ 10</span></h2>
-                </div>
-            </div>
-
             {seleccionados.length > 0 && (
-              <div style={{
-                backgroundColor: '#e8f5e9', border: '1px solid #25D366', padding: '15px',
-                borderRadius: '12px', marginBottom: '20px', display: 'flex',
-                justifyContent: 'space-between', alignItems: 'center'
-              }}>
-                <span style={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                  {seleccionados.length} cliente(s) seleccionado(s)
-                </span>
-                <button className="mend-button" onClick={dispararMensajes} disabled={disparando}>
-                  {disparando ? "Enviando..." : "Disparar Mensajes 🚀"}
-                </button>
+              <div style={{ backgroundColor: '#e8f5e9', padding: '15px', borderRadius: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 'bold' }}>{seleccionados.length} seleccionados</span>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="mend-button" onClick={() => setModoMonitor(true)} disabled={seleccionados.length > 5}>Monitor</button>
+                  <button className="mend-button" onClick={dispararMensajes} disabled={disparando}>Disparar</button>
+                </div>
               </div>
             )}
 
-            {/* <-- CONTENEDOR NUEVO: Título y botón de borrar juntos --> */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', marginBottom: '10px' }}>
-              <h3 style={{ margin: 0, color: '#111b21', fontSize: '1.2rem' }}>Lista de Deudores</h3>
-              {clientes.length > 0 && (
-                <button
-                  onClick={borrarListaCompleta}
-                  style={{
-                    backgroundColor: 'transparent', color: '#d32f2f', border: '1px solid #d32f2f',
-                    padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem'
-                  }}
-                >
-                  🗑️ Borrar Lista
-                </button>
-              )}
-            </div>
-
-            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #ddd' }}>
-                  <th style={{ padding: '10px', width: '40px' }}></th>
-                  <th style={{ padding: '10px' }}>Nombre</th>
-                  <th style={{ padding: '10px' }}>Teléfono</th>
-                  <th style={{ padding: '10px' }}>Deuda</th>
-                  <th style={{ padding: '10px' }}>Estado</th>
-                </tr>
-              </thead>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Deuda</th></tr></thead>
               <tbody>
-                {clientes.length > 0 ? (
-                  clientes.map(c => (
-                    <tr key={c.telefono} className="fila-clickeable" onClick={() => abrirChat(c)}>
-                      <td style={{ padding: '10px' }}>
-                        <input
-                          type="checkbox"
-                          checked={seleccionados.includes(c.telefono)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSeleccion(c.telefono)}
-                          style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                        />
-                      </td>
-                      <td style={{ padding: '10px' }}>{c.nombre}</td>
-                      <td style={{ padding: '10px' }}>{c.telefono}</td>
-                      <td style={{ padding: '10px', fontWeight: 'bold' }}>${c.deuda}</td>
-                      <td style={{ padding: '10px' }}>
-                        <span style={{
-                          backgroundColor: c.estado_campana === 'activa' ? '#e8f5e9' : c.estado_campana === 'pausada' ? '#fff3e0' : c.estado_campana === 'pendiente' ? '#e3f2fd' : '#ffebee',
-                          color: c.estado_campana === 'activa' ? '#2e7d32' : c.estado_campana === 'pausada' ? '#e65100' : c.estado_campana === 'pendiente' ? '#1565c0' : '#c62828',
-                          padding: '4px 8px', borderRadius: '12px', fontSize: '0.85em', fontWeight: 'bold'
-                        }}>
-                          {c.estado_campana ? c.estado_campana.toUpperCase() : 'DESCONOCIDO'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#667781' }}>No hay deudores cargados. Subí un Excel para arrancar.</td></tr>
-                )}
+                {clientes.map(c => (
+                  <tr key={c.telefono} className="fila-clickeable" onClick={() => abrirChat(c)}>
+                    <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={seleccionados.includes(c.telefono)} onChange={() => toggleSeleccion(c.telefono)} /></td>
+                    <td>{c.nombre}</td>
+                    <td>{c.telefono}</td>
+                    <td>${c.deuda}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
 
-        {clienteActivo && (
-          <div className="animate-fade-in">
-            <div className="chat-header" style={{ marginBottom: '20px', borderRadius: '12px' }}>
-              <div style={{ textAlign: 'left' }}>
-                <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.4rem' }}>
-                  Chat con {clienteActivo.nombre}
-                </h3>
-              </div>
-            </div>
-
-            <div className="chat-container" style={{ borderRadius: '12px 12px 0 0', height: '400px' }}>
-              {historialChat.length > 0 ? (
-                historialChat.map((msg, idx) => (
-                  <div key={idx} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
-                    <span>{msg.mensaje}</span>
-                    <span className="fecha-chat">
-                      {new Date(msg.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+        {modoMonitor && (
+          <div className="monitor-grid">
+            {seleccionados.map(telefono => {
+              const cliente = clientes.find(c => c.telefono === telefono);
+              const historial = chatsMultiples[telefono] || [];
+              return (
+                <div key={telefono} className="monitor-chat-card">
+                  <div className="monitor-header"><strong>{cliente?.nombre}</strong></div>
+                  <div className="monitor-chat-body">
+                    {historial.map((msg, i) => (
+                      <div key={i} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
+                        <span>{msg.mensaje}</span>
+                      </div>
+                    ))}
                   </div>
-                ))
-              ) : (
-                <p style={{ textAlign: 'center', color: '#667781', marginTop: '20px' }}>Cargando mensajes...</p>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={enviarMensajeEnVivo} style={{
-              display: 'flex', gap: '10px', padding: '15px', backgroundColor: '#f0f2f5',
-              borderLeft: '1px solid var(--border-light)', borderRight: '1px solid var(--border-light)'
-            }}>
-              <input
-                type="text"
-                value={mensajeManual}
-                onChange={(e) => setMensajeManual(e.target.value)}
-                placeholder="Escribí un mensaje y tomá el control del chat..."
-                style={{
-                  flex: 1, padding: '12px 15px', borderRadius: '24px',
-                  border: 'none', outline: 'none', fontSize: '0.95rem'
-                }}
-              />
-              <button
-                type="submit"
-                disabled={!mensajeManual.trim()}
-                style={{
-                  backgroundColor: mensajeManual.trim() ? '#25D366' : '#a8e5b6',
-                  color: 'white', border: 'none', borderRadius: '50%',
-                  width: '45px', height: '45px', cursor: mensajeManual.trim() ? 'pointer' : 'default',
-                  display: 'flex', justifyContent: 'center', alignItems: 'center'
-                }}
-              >
-                ➤
-              </button>
-            </form>
-
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              backgroundColor: '#f0f2f5', padding: '12px 20px', borderRadius: '0 0 12px 12px',
-              border: '1px solid var(--border-light)', borderTop: 'none'
-            }}>
-              <button className="secondary-button" onClick={cerrarChat}>← Volver a la lista</button>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  className="secondary-button" onClick={irAnterior} disabled={indiceActual === 0}
-                  style={{ opacity: indiceActual === 0 ? 0.5 : 1, cursor: indiceActual === 0 ? 'not-allowed' : 'pointer' }}
-                >
-                  ◀ Anterior
-                </button>
-                <button
-                  className="secondary-button" onClick={irSiguiente} disabled={indiceActual === clientes.length - 1}
-                  style={{ opacity: indiceActual === clientes.length - 1 ? 0.5 : 1, cursor: indiceActual === clientes.length - 1 ? 'not-allowed' : 'pointer' }}
-                >
-                  Siguiente ▶
-                </button>
-              </div>
-            </div>
+                  <div className="monitor-input-area">
+                    <input type="text" value={mensajesRapidos[telefono] || ""} onChange={(e) => setMensajesRapidos(p => ({ ...p, [telefono]: e.target.value }))} />
+                    <button className="mend-button" onClick={() => enviarMensajeMonitor(telefono)}>➤</button>
+                  </div>
+                </div>
+              );
+            })}
+            <button className="mend-button" onClick={cerrarMonitor} style={{ gridColumn: '1/-1', marginTop: '10px' }}>Cerrar Monitor</button>
           </div>
         )}
 
+        {clienteActivo && !modoMonitor && (
+          <div>
+            <div className="chat-header"><h3>Chat con {clienteActivo.nombre}</h3></div>
+            <div className="chat-container">
+              {historialChat.map((msg, i) => (
+                <div key={i} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
+                  <span>{msg.mensaje}</span>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <form onSubmit={enviarMensajeIndividual} style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              <input type="text" style={{ flex: 1 }} value={mensajeManual} onChange={(e) => setMensajeManual(e.target.value)} />
+              <button className="mend-button" type="submit">➤</button>
+            </form>
+            <button className="secondary-button" style={{ marginTop: '10px' }} onClick={cerrarChat}>Volver</button>
+          </div>
+        )}
       </section>
     </main>
   );
