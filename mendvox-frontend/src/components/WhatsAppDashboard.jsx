@@ -46,7 +46,7 @@ export default function WhatsAppDashboard() {
     return () => clearInterval(intervalo);
   }, [clienteActivo, modoMonitor]);
 
-  useEffect(() => {
+useEffect(() => {
     let intervalo;
     if (modoMonitor && seleccionados.length > 0) {
       const buscarMultiplesChats = async () => {
@@ -56,6 +56,9 @@ export default function WhatsAppDashboard() {
           const nuevosChats = {};
           resultados.forEach((res, i) => nuevosChats[seleccionados[i]] = res.data);
           setChatsMultiples(nuevosChats);
+
+          cargarClientes();
+
         } catch (e) { console.error(e); }
       };
       buscarMultiplesChats();
@@ -141,7 +144,7 @@ export default function WhatsAppDashboard() {
               <thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Deuda</th></tr></thead>
               <tbody>
                 {clientes.map(c => (
-                  <tr key={c.telefono} className="fila-clickeable" onClick={() => abrirChat(c)}>
+                    <tr key={c.telefono} className={`fila-clickeable ${c.estado_campana === 'alerta' ? 'fila-alerta' : ''}`} onClick={() => abrirChat(c)}>
                     <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={seleccionados.includes(c.telefono)} onChange={() => toggleSeleccion(c.telefono)} /></td>
                     <td>{c.nombre}</td>
                     <td>{c.telefono}</td>
@@ -159,7 +162,7 @@ export default function WhatsAppDashboard() {
               const cliente = clientes.find(c => c.telefono === telefono);
               const historial = chatsMultiples[telefono] || [];
               return (
-                <div key={telefono} className="monitor-chat-card">
+                <div key={telefono} className={`monitor-chat-card ${cliente?.estado_campana === 'alerta' ? 'tarjeta-alerta' : ''}`}>
                   <div className="monitor-header"><strong>{cliente?.nombre}</strong></div>
                   <div className="monitor-chat-body">
                     {historial.map((msg, i) => (

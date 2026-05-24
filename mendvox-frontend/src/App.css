@@ -349,3 +349,45 @@ body { margin: 0; font-family: -apple-system, sans-serif; background-color: var(
 .burbuja { padding: 8px 12px; border-radius: 8px; max-width: 70%; font-size: 0.95rem; }
 .burbuja.bot { background: #d9fdd3; align-self: flex-end; }
 .burbuja.cliente { background: #fff; align-self: flex-start; }
+
+@keyframes latidoAlerta {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 15px 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.fila-alerta {
+  background-color: #fee2e2 !important;
+  border-left: 4px solid #ef4444;
+}
+
+.tarjeta-alerta {
+  border: 2px solid #ef4444 !important;
+  animation: latidoAlerta 1.5s infinite;
+}
+
+.tarjeta-alerta .monitor-header {
+  background-color: #ef4444 !important;
+  color: white;
+}
+
+@keyframes latidoAlerta {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 15px 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.fila-alerta {
+  background-color: #fee2e2 !important;
+  border-left: 4px solid #ef4444 !important;
+}
+
+.tarjeta-alerta {
+  border: 2px solid #ef4444 !important;
+  animation: latidoAlerta 1.5s infinite;
+}
+
+.tarjeta-alerta .monitor-header {
+  background-color: #ef4444 !important;
+  color: white !important;
+}
