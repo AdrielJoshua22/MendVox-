@@ -73,7 +73,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     if (!chatIA) {
         chatIA = aiModel.startChat({
             history: [
-                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}, Servicio: ${cliente.servicio}. NUNCA digas que sos un bot. Habla argentino informal pero laboral.` }] },
+                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}, Servicio: ${cliente.servicio}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA VITAL: Si el cliente te insulta, se enoja mucho, pide explícitamente hablar con una persona real, o propone un plan de pago que no podés resolver, agregá EXACTAMENTE la palabra [ALERTA_HUMANA] al final de tu respuesta.` }] },
                 { role: "model", parts: [{ text: "Dale, arranco." }] }
             ]
         });
@@ -81,9 +81,18 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     }
 
     const aiResult = await chatIA.sendMessage(userInput);
-    const textoFinal = aiResult.response.text();
+    let textoFinal = aiResult.response.text();
+    let requiereIntervencion = false;
+
+    // Detectamos la palabra clave secreta de Gemini
+    if (textoFinal.includes('[ALERTA_HUMANA]')) {
+        requiereIntervencion = true;
+        textoFinal = textoFinal.replace('[ALERTA_HUMANA]', '').trim();
+        humanosAlMando.add(jid); // Bloqueamos a la IA para que no siga hablando
+    }
+
     mensajesGeneradosPorIA.add(textoFinal);
-    console.log(`Gemini a ${cliente.nombre}: ${textoFinal}`);
+    console.log(`[Gemini] a ${cliente.nombre}: ${textoFinal}`);
 
     if (estadoActual === 'TEXTO') {
         await sock.sendMessage(jid, { text: textoFinal });
@@ -93,7 +102,13 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
             await sock.sendMessage(jid, { audio: Buffer.from(res.data), mimetype: 'audio/ogg; codecs=opus', ptt: true }, { quoted: msg });
         }
     }
+
     await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)", [cliente.telefono, textoFinal]);
+
+    if (requiereIntervencion) {
+        await pool.query("UPDATE clientes SET estado_campana = 'alerta' WHERE telefono = ?", [cliente.telefono]);
+        console.log(`ALERTA: Intervención humana requerida para ${cliente.nombre}`);
+    }
 }
 
 app.get('/api/clientes', async (req, res) => {
@@ -205,74 +220,72 @@ async function connectToWhatsApp() {
         }
     });
 
-    sock.ev.on('messages.upsert', async m => {
-        if (!isSocketConnected) return;
-        const msg = m.messages[0];
-        if (!msg.message) return;
+   sock.ev.on('messages.upsert', async m => {
+       if (!isSocketConnected) return;
+       const msg = m.messages[0];
+       if (!msg.message) return;
 
-        let from = msg.key.remoteJid;
+       let from = msg.key.remoteJid;
+       if (from && from.includes('@lid') && msg.key.remoteJidAlt) {
+           from = msg.key.remoteJidAlt;
+       }
 
-        if (from && from.includes('@lid') && msg.key.remoteJidAlt) {
-            from = msg.key.remoteJidAlt;
-        }
+       const userInput = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+       const comandosSistema = ["Listo, a partir de ahora te respondo por texto.", "Listo, a partir de ahora te respondo con audios.", "Che, el sistema está medio colapsado en este momento."];
 
-        const userInput = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-        const comandosSistema = ["Listo, a partir de ahora te respondo por texto.", "Listo, a partir de ahora te respondo con audios.", "Che, el sistema está medio colapsado en este momento."];
+       if (from === 'status@broadcast' || from?.endsWith('@g.us') || from?.includes('@lid')) return;
+       if (comandosSistema.includes(userInput) || !userInput) return;
 
-        if (from === 'status@broadcast' || from?.endsWith('@g.us') || from?.includes('@lid')) return;
+       const numeroRaw = from.split('@')[0];
+       const numeroCorto = numeroRaw.length >= 10 ? numeroRaw.slice(-10) : numeroRaw;
 
-        console.log(`NUEVO MENSAJE -> De: ${from} | Texto: ${userInput} | fromMe: ${msg.key.fromMe}`);
+       try {
+           const [rows] = await pool.query("SELECT * FROM clientes WHERE telefono LIKE ?", [`%${numeroCorto}%`]);
+           const cliente = rows[0];
+           if (!cliente) return;
 
-        if (comandosSistema.includes(userInput) || !userInput) {
-            return;
-        }
+           const numeroOficial = cliente.telefono;
+           const jidOficial = `${numeroOficial}@s.whatsapp.net`;
 
-        const numeroRaw = from.split('@')[0];
-        const numeroCorto = numeroRaw.length >= 10 ? numeroRaw.slice(-10) : numeroRaw;
+           if (msg.key.fromMe) {
+               // ... (Tu código de fromMe intacto)
+               const inputMin = userInput.toLowerCase();
+               if (inputMin === 'modo texto') return await sock.sendMessage(from, { text: comandosSistema[0] }).then(() => preferenciasChat.set(jidOficial, 'TEXTO'));
+               if (inputMin === 'modo audio') return await sock.sendMessage(from, { text: comandosSistema[1] }).then(() => preferenciasChat.set(jidOficial, 'AUDIO'));
 
-        try {
-            const [rows] = await pool.query("SELECT * FROM clientes WHERE telefono LIKE ?", [`%${numeroCorto}%`]);
-            const cliente = rows[0];
+               if (!mensajesGeneradosPorIA.has(userInput)) {
+                   humanosAlMando.add(jidOficial);
+                   await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)", [numeroOficial, userInput]);
+               }
+               return;
+           }
 
-            if (!cliente) {
-                console.log(`No se encontro a ${numeroCorto} en la DB.`);
-                return;
-            }
+           // NUEVO: FILTRO ANTI-INSULTOS (Rápido y local)
+           const palabrasAgresivas = ['concha', 'puta', 'puto', 'mierda', 'hijos de', 'ladre', 'harto', 'denunciar', 'abogado'];
+           const esInsulto = palabrasAgresivas.some(palabra => userInput.toLowerCase().includes(palabra));
 
-            const numeroOficial = cliente.telefono;
-            const jidOficial = `${numeroOficial}@s.whatsapp.net`;
+           if (esInsulto) {
+               console.log(`🚨 [ALERTA ROJA] Lenguaje agresivo detectado de ${cliente.nombre}`);
+               humanosAlMando.add(jidOficial); // Silenciamos a la IA instantáneamente
+               await pool.query("UPDATE clientes SET estado_campana = 'alerta', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
+           } else {
+               // Si no hay insulto, actualizamos normal
+               await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
+           }
 
-            if (msg.key.fromMe) {
-                const inputMin = userInput.toLowerCase();
-                if (inputMin === 'modo texto') return await sock.sendMessage(from, { text: comandosSistema[0] }).then(() => preferenciasChat.set(jidOficial, 'TEXTO'));
-                if (inputMin === 'modo audio') return await sock.sendMessage(from, { text: comandosSistema[1] }).then(() => preferenciasChat.set(jidOficial, 'AUDIO'));
+           await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)", [numeroOficial, userInput]);
 
-                if (!mensajesGeneradosPorIA.has(userInput)) {
-                    humanosAlMando.add(jidOficial);
-                    console.log(`Control manual activado para ${cliente.nombre}`);
-                    await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)", [numeroOficial, userInput]);
-                }
-                return;
-            }
+           if (humanosAlMando.has(jidOficial)) {
+               console.log(`IA silenciada para ${cliente.nombre}`);
+               return;
+           }
 
-            await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
-            await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)", [numeroOficial, userInput]);
-            console.log(`Guardado en BD -> Cliente ${cliente.nombre}: ${userInput}`);
+           await procesarRespuestaIA(jidOficial, userInput, cliente, msg);
 
-            if (humanosAlMando.has(jidOficial)) {
-                console.log(`IA silenciada para ${cliente.nombre}`);
-                return;
-            }
-
-            await procesarRespuestaIA(jidOficial, userInput, cliente, msg);
-
-        } catch (e) {
-            console.error("Error procesando mensaje:", e);
-            if (e.message && (e.message.includes("429") || e.message.includes("Quota") || e.message.includes("503"))) {
-                await sock.sendMessage(from, { text: comandosSistema[2] });
-            }
-        }
-    });
+       } catch (e) {
+           console.error("Error procesando mensaje:", e);
+       }
+   });
 }
 
 server.listen(PORT, () => {
