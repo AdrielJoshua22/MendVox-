@@ -83,12 +83,10 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     const aiResult = await chatIA.sendMessage(userInput);
     let textoFinal = aiResult.response.text();
     let requiereIntervencion = false;
-
-    // Detectamos la palabra clave secreta de Gemini
     if (textoFinal.includes('[ALERTA_HUMANA]')) {
         requiereIntervencion = true;
         textoFinal = textoFinal.replace('[ALERTA_HUMANA]', '').trim();
-        humanosAlMando.add(jid); // Bloqueamos a la IA para que no siga hablando
+        humanosAlMando.add(jid);
     }
 
     mensajesGeneradosPorIA.add(textoFinal);
@@ -169,17 +167,16 @@ app.post('/api/campana/disparar', async (req, res) => {
 });
 
 app.post('/api/chats/enviar', async (req, res) => {
-    if (!sock || !isSocketConnected) return res.status(500).json({ error: "WhatsApp desconectado" });
-    const { telefono, mensaje } = req.body;
-    if (!telefono || !mensaje) return res.status(400).json({ error: "Faltan datos" });
-
-    const jid = `${telefono}@s.whatsapp.net`;
     try {
+        const { telefono, mensaje } = req.body;
+        const jid = `${telefono}@s.whatsapp.net`;
         await sock.sendMessage(jid, { text: mensaje });
         humanosAlMando.add(jid);
-        await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)", [telefono, mensaje]);
         res.json({ success: true });
-    } catch (error) { res.status(500).json({ error: "Error enviando el mensaje" }); }
+    } catch (error) {
+        console.error("Error enviando mensaje manual:", error);
+        res.status(500).json({ error: "Error interno" });
+    }
 });
 
 app.delete('/api/campana/borrar', async (req, res) => {
@@ -248,7 +245,7 @@ async function connectToWhatsApp() {
            const jidOficial = `${numeroOficial}@s.whatsapp.net`;
 
            if (msg.key.fromMe) {
-               // ... (Tu código de fromMe intacto)
+
                const inputMin = userInput.toLowerCase();
                if (inputMin === 'modo texto') return await sock.sendMessage(from, { text: comandosSistema[0] }).then(() => preferenciasChat.set(jidOficial, 'TEXTO'));
                if (inputMin === 'modo audio') return await sock.sendMessage(from, { text: comandosSistema[1] }).then(() => preferenciasChat.set(jidOficial, 'AUDIO'));
@@ -260,16 +257,14 @@ async function connectToWhatsApp() {
                return;
            }
 
-           // NUEVO: FILTRO ANTI-INSULTOS (Rápido y local)
            const palabrasAgresivas = ['concha', 'puta', 'puto', 'mierda', 'hijos de', 'ladre', 'harto', 'denunciar', 'abogado'];
            const esInsulto = palabrasAgresivas.some(palabra => userInput.toLowerCase().includes(palabra));
 
            if (esInsulto) {
-               console.log(`🚨 [ALERTA ROJA] Lenguaje agresivo detectado de ${cliente.nombre}`);
-               humanosAlMando.add(jidOficial); // Silenciamos a la IA instantáneamente
+               console.log(`[ALERTA ROJA] Lenguaje agresivo detectado de ${cliente.nombre}`);
+               humanosAlMando.add(jidOficial);
                await pool.query("UPDATE clientes SET estado_campana = 'alerta', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
            } else {
-               // Si no hay insulto, actualizamos normal
                await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
            }
 
