@@ -11,6 +11,8 @@ import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
 import qrcode from "qrcode-terminal";
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import FormData from 'form-data';
 
 const PORT = process.env.PORT || 3000;
 const PYTHON_BACKEND_URL = "http://localhost:8000/api/tts";
@@ -83,6 +85,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     const aiResult = await chatIA.sendMessage(userInput);
     let textoFinal = aiResult.response.text();
     let requiereIntervencion = false;
+
     if (textoFinal.includes('[ALERTA_HUMANA]')) {
         requiereIntervencion = true;
         textoFinal = textoFinal.replace('[ALERTA_HUMANA]', '').trim();
@@ -105,7 +108,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
 
     if (requiereIntervencion) {
         await pool.query("UPDATE clientes SET estado_campana = 'alerta' WHERE telefono = ?", [cliente.telefono]);
-        console.log(`ALERTA: Intervención humana requerida para ${cliente.nombre}`);
+        console.log(`ALERTA: Intervencion humana requerida para ${cliente.nombre}`);
     }
 }
 
@@ -227,10 +230,36 @@ async function connectToWhatsApp() {
            from = msg.key.remoteJidAlt;
        }
 
-       const userInput = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-       const comandosSistema = ["Listo, a partir de ahora te respondo por texto.", "Listo, a partir de ahora te respondo con audios.", "Che, el sistema está medio colapsado en este momento."];
-
        if (from === 'status@broadcast' || from?.endsWith('@g.us') || from?.includes('@lid')) return;
+
+       const comandosSistema = ["Listo, a partir de ahora te respondo por texto.", "Listo, a partir de ahora te respondo con audios.", "Che, el sistema está medio colapsado en este momento."];
+       let userInput = "";
+
+       if (msg.message?.audioMessage) {
+           console.log(`Audio recibido del cliente, enviando a Audio Mender...`);
+
+           const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+
+       const formData = new FormData();
+                  formData.append('audio', buffer, 'nota_de_voz.ogg');
+
+                  try {
+                      const resAudio = await axios.post('http://localhost:8080/api/v1/mend/audio', formData, {
+                          headers: formData.getHeaders()
+                      });
+
+             userInput = resAudio.data.text || "";
+               console.log(`Texto limpio obtenido: ${userInput}`);
+
+           } catch (error) {
+               console.error("Error en Audio Mender:", error.message);
+               await sock.sendMessage(from, { text: "Perdoná, se me cortó el audio. ¿Me lo podés escribir por favor?" });
+               return;
+           }
+       } else {
+           userInput = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+       }
+
        if (comandosSistema.includes(userInput) || !userInput) return;
 
        const numeroRaw = from.split('@')[0];
@@ -245,7 +274,6 @@ async function connectToWhatsApp() {
            const jidOficial = `${numeroOficial}@s.whatsapp.net`;
 
            if (msg.key.fromMe) {
-
                const inputMin = userInput.toLowerCase();
                if (inputMin === 'modo texto') return await sock.sendMessage(from, { text: comandosSistema[0] }).then(() => preferenciasChat.set(jidOficial, 'TEXTO'));
                if (inputMin === 'modo audio') return await sock.sendMessage(from, { text: comandosSistema[1] }).then(() => preferenciasChat.set(jidOficial, 'AUDIO'));
