@@ -33,6 +33,9 @@ app.use(express.json());
 const server = http.createServer(app);
 const upload = multer({ dest: 'uploads/' });
 
+if (!fs.existsSync('audios')) fs.mkdirSync('audios');
+app.use('/audios', express.static('audios'));
+
 let sock;
 let isSocketConnected = false;
 const preferenciasChat = new Map();
@@ -52,7 +55,7 @@ const promesaConTimeout = (promesa, ms) => {
 
 async function procesarEnvioCampana(cliente) {
     const numeroFormateado = `${cliente.telefono}@s.whatsapp.net`;
-    const mensajeInicial = `Hola ${cliente.nombre}, soy Joshua del área de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
+    const mensajeInicial = `Hola ${cliente.nombre}, soy Joshua del area de cobranzas de MendVox. Te escribo por el saldo pendiente de $${cliente.deuda} de tu ${cliente.servicio}. ¿Podemos coordinar el pago para esta semana?`;
 
     try {
         await promesaConTimeout(sock.sendMessage(numeroFormateado, { text: mensajeInicial }), 10000);
@@ -75,7 +78,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     if (!chatIA) {
         chatIA = aiModel.startChat({
             history: [
-                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}, Servicio: ${cliente.servicio}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA VITAL: Si el cliente te insulta, se enoja mucho, pide explícitamente hablar con una persona real, o propone un plan de pago que no podés resolver, agregá EXACTAMENTE la palabra [ALERTA_HUMANA] al final de tu respuesta.` }] },
+                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}, Servicio: ${cliente.servicio}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA VITAL: Si el cliente te insulta, se enoja mucho, pide explicitamente hablar con una persona real, o propone un plan de pago que no podes resolver, agrega EXACTAMENTE la palabra [ALERTA_HUMANA] al final de tu respuesta.` }] },
                 { role: "model", parts: [{ text: "Dale, arranco." }] }
             ]
         });
@@ -133,6 +136,30 @@ app.get('/api/metricas', async (req, res) => {
         const [activos] = await pool.query("SELECT COUNT(*) as total FROM clientes WHERE estado_campana = 'activa'");
         res.json({ totalDeuda: Number(deuda[0].total || 0), contactados: contactados[0].total || 0, activos: activos[0].total || 0 });
     } catch (error) { res.status(500).json({ error: "Error interno" }); }
+});
+
+app.get('/api/chats/:telefono/estado-ia', (req, res) => {
+    const jid = `${req.params.telefono}@s.whatsapp.net`;
+    res.json({ iaSilenciada: humanosAlMando.has(jid) });
+});
+
+app.post('/api/chats/:telefono/toggle-ia', async (req, res) => {
+    try {
+        const telefono = req.params.telefono;
+        const jid = `${telefono}@s.whatsapp.net`;
+
+        if (humanosAlMando.has(jid)) {
+            humanosAlMando.delete(jid);
+            await pool.query("UPDATE clientes SET estado_campana = 'activa' WHERE telefono = ?", [telefono]);
+            res.json({ success: true, iaSilenciada: false });
+        } else {
+            humanosAlMando.add(jid);
+            res.json({ success: true, iaSilenciada: true });
+        }
+    } catch (error) {
+        console.error("Error cambiando estado de IA:", error);
+        res.status(500).json({ error: "Error interno" });
+    }
 });
 
 app.post('/api/campana/upload', upload.single('archivo_campana'), async (req, res) => {
@@ -232,28 +259,30 @@ async function connectToWhatsApp() {
 
        if (from === 'status@broadcast' || from?.endsWith('@g.us') || from?.includes('@lid')) return;
 
-       const comandosSistema = ["Listo, a partir de ahora te respondo por texto.", "Listo, a partir de ahora te respondo con audios.", "Che, el sistema está medio colapsado en este momento."];
+       const comandosSistema = ["Listo, a partir de ahora te respondo por texto.", "Listo, a partir de ahora te respondo con audios.", "Che, el sistema esta medio colapsado en este momento."];
        let userInput = "";
+       let rutaAudioLocal = "";
 
        if (msg.message?.audioMessage) {
            console.log(`Audio recibido del cliente, enviando a Audio Mender...`);
-
            const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
 
-       const formData = new FormData();
-                  formData.append('audio', buffer, 'nota_de_voz.ogg');
+           const nombreArchivo = `audio_${Date.now()}.ogg`;
+           fs.writeFileSync(`audios/${nombreArchivo}`, buffer);
+           rutaAudioLocal = `/audios/${nombreArchivo}`;
 
-                  try {
-                      const resAudio = await axios.post('http://localhost:8080/api/v1/mend/audio', formData, {
-                          headers: formData.getHeaders()
-                      });
+           const formData = new FormData();
+           formData.append('audio', buffer, 'nota_de_voz.ogg');
 
-             userInput = resAudio.data.text || "";
-               console.log(`Texto limpio obtenido: ${userInput}`);
-
+           try {
+               const resAudio = await axios.post('http://localhost:8000/api/transcribir', formData, {
+                   headers: formData.getHeaders()
+               });
+               userInput = resAudio.data.text || "";
+               console.log(`Texto limpio obtenido (Whisper): ${userInput}`);
            } catch (error) {
-               console.error("Error en Audio Mender:", error.message);
-               await sock.sendMessage(from, { text: "Perdoná, se me cortó el audio. ¿Me lo podés escribir por favor?" });
+               console.error("Error en Audio Mender:", error.response?.data || error.code || error.message);
+               await sock.sendMessage(from, { text: "Perdona, se me corto el audio. ¿Me lo podes escribir por favor?" });
                return;
            }
        } else {
@@ -285,18 +314,19 @@ async function connectToWhatsApp() {
                return;
            }
 
+           const mensajeParaBD = rutaAudioLocal ? `[AUDIO:${rutaAudioLocal}] ${userInput}` : userInput;
            const palabrasAgresivas = ['concha', 'puta', 'puto', 'mierda', 'hijos de', 'ladre', 'harto', 'denunciar', 'abogado'];
            const esInsulto = palabrasAgresivas.some(palabra => userInput.toLowerCase().includes(palabra));
 
            if (esInsulto) {
-               console.log(`[ALERTA ROJA] Lenguaje agresivo detectado de ${cliente.nombre}`);
+               console.log(`ALERTA ROJA Lenguaje agresivo detectado de ${cliente.nombre}`);
                humanosAlMando.add(jidOficial);
                await pool.query("UPDATE clientes SET estado_campana = 'alerta', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
            } else {
                await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
            }
 
-           await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)", [numeroOficial, userInput]);
+           await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)", [numeroOficial, mensajeParaBD]);
 
            if (humanosAlMando.has(jidOficial)) {
                console.log(`IA silenciada para ${cliente.nombre}`);
