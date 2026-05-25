@@ -4,13 +4,16 @@ import functools
 import subprocess
 import numpy as np
 import librosa
+import whisper
+import tempfile
 from scipy.io import wavfile
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from TTS.api import TTS
 import TTS.tts.models.xtts as xtts_module
 
+# --- PARCHES PARA XTTS ---
 old_torch_load = torch.load
 @functools.wraps(old_torch_load)
 def new_torch_load(*args, **kwargs):
@@ -25,13 +28,20 @@ xtts_module.load_audio = fake_load_audio
 
 app = FastAPI()
 
+# --- CARGA DE MODELOS ---
 device = "cpu" 
 print(f"Cargando XTTS v2 en {device}...")
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 print("Motor de clonacion MendVox listo y parcheado.")
 
+print("Cargando modelo Whisper (base)...")
+modelo_whisper = whisper.load_model("base")
+print("Whisper listo para transcribir.")
+
 class TextRequest(BaseModel):
     text: str
+
+# --- RUTAS DE LA API ---
 
 @app.post("/api/tts")
 async def generate_speech(request: TextRequest):
@@ -62,3 +72,23 @@ async def generate_speech(request: TextRequest):
     except Exception as e:
         print(f"Error capturado: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/transcribir")
+async def transcribir_audio(audio: UploadFile = File(...)):
+    print("Recibiendo audio para transcribir con Whisper...")
+    # Creamos un archivo temporal para que Whisper lo pueda leer
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tmp:
+        tmp.write(await audio.read())
+        tmp_path = tmp.name
+        
+    try:
+        # Transcribimos forzando el idioma español
+        resultado = modelo_whisper.transcribe(tmp_path, language="es")
+        texto_limpio = resultado["text"].strip()
+        print(f"Transcripción exitosa: {texto_limpio}")
+        
+        return {"text": texto_limpio}
+    finally:
+        # Nos aseguramos de borrar el archivo temporal para no llenar el disco
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
