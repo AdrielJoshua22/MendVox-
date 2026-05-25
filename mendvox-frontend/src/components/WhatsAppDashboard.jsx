@@ -13,13 +13,14 @@ export default function WhatsAppDashboard() {
   const [modoMonitor, setModoMonitor] = useState(false);
   const [chatsMultiples, setChatsMultiples] = useState({});
   const [mensajesRapidos, setMensajesRapidos] = useState({});
+  const [iaSilenciada, setIaSilenciada] = useState(false);
+  const [estadosIA, setEstadosIA] = useState({});
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     cargarClientes();
     cargarMetricas();
   }, []);
-
 
   const cargarClientes = () => {
     axios.get('http://localhost:3000/api/clientes')
@@ -47,7 +48,7 @@ export default function WhatsAppDashboard() {
     return () => clearInterval(intervalo);
   }, [clienteActivo, modoMonitor]);
 
-useEffect(() => {
+  useEffect(() => {
     let intervalo;
     if (modoMonitor && seleccionados.length > 0) {
       const buscarMultiplesChats = async () => {
@@ -58,9 +59,16 @@ useEffect(() => {
           resultados.forEach((res, i) => nuevosChats[seleccionados[i]] = res.data);
           setChatsMultiples(nuevosChats);
 
-          cargarClientes();
+          const promesasIA = seleccionados.map(t => axios.get(`http://localhost:3000/api/chats/${t}/estado-ia`));
+          const resultadosIA = await Promise.all(promesasIA);
+          const nuevosEstados = {};
+          resultadosIA.forEach((res, i) => nuevosEstados[seleccionados[i]] = res.data.iaSilenciada);
+          setEstadosIA(nuevosEstados);
 
-        } catch (e) { console.error(e); }
+          cargarClientes();
+        } catch (e) {
+          console.error(e);
+        }
       };
       buscarMultiplesChats();
       intervalo = setInterval(buscarMultiplesChats, 3000);
@@ -68,9 +76,25 @@ useEffect(() => {
     return () => clearInterval(intervalo);
   }, [modoMonitor, seleccionados]);
 
-  const abrirChat = (cliente) => { setClienteActivo(cliente); setModoMonitor(false); };
-  const cerrarChat = () => { setClienteActivo(null); setHistorialChat([]); setMensajeManual(""); };
-  const cerrarMonitor = () => { setModoMonitor(false); setChatsMultiples({}); };
+  const abrirChat = (cliente) => {
+    setClienteActivo(cliente);
+    setModoMonitor(false);
+
+    axios.get(`http://localhost:3000/api/chats/${cliente.telefono}/estado-ia`)
+      .then(res => setIaSilenciada(res.data.iaSilenciada))
+      .catch(err => console.error(err));
+  };
+
+  const cerrarChat = () => {
+    setClienteActivo(null);
+    setHistorialChat([]);
+    setMensajeManual("");
+  };
+
+  const cerrarMonitor = () => {
+    setModoMonitor(false);
+    setChatsMultiples({});
+  };
 
   const toggleSeleccion = (telefono) => {
     setSeleccionados(prev => prev.includes(telefono) ? prev.filter(t => t !== telefono) : [...prev, telefono]);
@@ -85,7 +109,9 @@ useEffect(() => {
       setSeleccionados([]);
       cargarClientes();
       cargarMetricas();
-    } catch (e) { toast.error("Error", { id }); }
+    } catch (e) {
+      toast.error("Error", { id });
+    }
     setDisparando(false);
   };
 
@@ -97,7 +123,11 @@ useEffect(() => {
     try {
       await axios.post('http://localhost:3000/api/chats/enviar', { telefono: clienteActivo.telefono, mensaje: texto });
       setHistorialChat(prev => [...prev, { remitente: 'bot', mensaje: texto, fecha: new Date() }]);
-    } catch (e) { toast.error("Error"); setMensajeManual(texto); }
+      setIaSilenciada(true);
+    } catch (e) {
+      toast.error("Error");
+      setMensajeManual(texto);
+    }
   };
 
   const enviarMensajeMonitor = async (telefono) => {
@@ -106,30 +136,68 @@ useEffect(() => {
     try {
       await axios.post('http://localhost:3000/api/chats/enviar', { telefono, mensaje: texto });
       setMensajesRapidos(prev => ({ ...prev, [telefono]: "" }));
-    } catch (e) { toast.error("Error"); }
+      setEstadosIA(prev => ({ ...prev, [telefono]: true }));
+    } catch (e) {
+      toast.error("Error");
+    }
+  };
+
+  const handleToggleIA = async () => {
+    if (!clienteActivo) return;
+    try {
+      const res = await axios.post(`http://localhost:3000/api/chats/${clienteActivo.telefono}/toggle-ia`);
+      setIaSilenciada(res.data.iaSilenciada);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleToggleIAMonitor = async (telefono) => {
+    try {
+      const res = await axios.post(`http://localhost:3000/api/chats/${telefono}/toggle-ia`);
+      setEstadosIA(prev => ({ ...prev, [telefono]: res.data.iaSilenciada }));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const renderizarMensaje = (texto) => {
+    if (texto && texto.startsWith('[AUDIO:')) {
+      const finUrl = texto.indexOf(']');
+      const url = texto.substring(7, finUrl);
+      const transcripcion = texto.substring(finUrl + 1).trim();
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <audio controls src={`http://localhost:3000${url}`} style={{ height: '35px', maxWidth: '100%' }} />
+          <span style={{ fontStyle: 'italic', color: '#555' }}>"{transcripcion}"</span>
+        </div>
+      );
+    }
+    return <span>{texto}</span>;
   };
 
   return (
     <main className="card" style={{ maxWidth: modoMonitor ? '1200px' : '900px' }}>
       <header>
         <h1 className="logo" style={{ color: '#25D366' }}>MendVox Cobranzas</h1>
-        <p className="subtitle">Gestión automatizada por WhatsApp</p>
+        <p className="subtitle">Gestion automatizada por WhatsApp</p>
       </header>
 
-           <section style={{ display: 'flex', gap: '15px', marginBottom: '20px', marginTop: '20px' }}>
-             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
-               <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
-               <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
-             </div>
-             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
-               <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
-               <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
-             </div>
-             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #FF9F43' }}>
-               <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Chats Activos (Bot)</h4>
-               <h2 style={{ margin: 0 }}>{metricas.activos} <span style={{fontSize: '1rem', color: '#667781'}}>/ 10</span></h2>
-             </div>
-           </section>
+      <section style={{ display: 'flex', gap: '15px', marginBottom: '20px', marginTop: '20px' }}>
+        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
+          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
+          <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
+        </div>
+        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
+          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
+          <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
+        </div>
+        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #FF9F43' }}>
+          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Chats Activos (Bot)</h4>
+          <h2 style={{ margin: 0 }}>{metricas.activos} <span style={{fontSize: '1rem', color: '#667781'}}>/ 10</span></h2>
+        </div>
+      </section>
 
       <section className="input-section">
         {!clienteActivo && !modoMonitor && (
@@ -145,11 +213,13 @@ useEffect(() => {
             )}
 
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Deuda</th></tr></thead>
+              <thead><tr><th></th><th>Nombre</th><th>Telefono</th><th>Deuda</th></tr></thead>
               <tbody>
                 {clientes.map(c => (
-                    <tr key={c.telefono} className={`fila-clickeable ${c.estado_campana === 'alerta' ? 'fila-alerta' : ''}`} onClick={() => abrirChat(c)}>
-                    <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={seleccionados.includes(c.telefono)} onChange={() => toggleSeleccion(c.telefono)} /></td>
+                  <tr key={c.telefono} className={`fila-clickeable ${c.estado_campana === 'alerta' ? 'fila-alerta' : ''}`} onClick={() => abrirChat(c)}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={seleccionados.includes(c.telefono)} onChange={() => toggleSeleccion(c.telefono)} />
+                    </td>
                     <td>{c.nombre}</td>
                     <td>{c.telefono}</td>
                     <td>${c.deuda}</td>
@@ -165,19 +235,56 @@ useEffect(() => {
             {seleccionados.map(telefono => {
               const cliente = clientes.find(c => c.telefono === telefono);
               const historial = chatsMultiples[telefono] || [];
+              const iaApagada = estadosIA[telefono] || false;
+
               return (
-                <div key={telefono} className={`monitor-chat-card ${cliente?.estado_campana === 'alerta' ? 'tarjeta-alerta' : ''}`}>
-                  <div className="monitor-header"><strong>{cliente?.nombre}</strong></div>
-                  <div className="monitor-chat-body">
+                <div key={telefono} className={`monitor-chat-card ${cliente?.estado_campana === 'alerta' ? 'tarjeta-alerta' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '450px' }}>
+                  <div className="monitor-header" style={{ flexShrink: 0 }}>
+                    <strong>{cliente?.nombre}</strong>
+                  </div>
+
+                  <div className="monitor-chat-body" style={{ flex: 1, overflowY: 'auto' }}>
                     {historial.map((msg, i) => (
                       <div key={i} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
-                        <span>{msg.mensaje}</span>
+                        {renderizarMensaje(msg.mensaje)}
                       </div>
                     ))}
                   </div>
-                  <div className="monitor-input-area">
-                    <input type="text" value={mensajesRapidos[telefono] || ""} onChange={(e) => setMensajesRapidos(p => ({ ...p, [telefono]: e.target.value }))} />
-                    <button className="mend-button" onClick={() => enviarMensajeMonitor(telefono)}>➤</button>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', backgroundColor: '#f0f2f5', flexShrink: 0 }}>
+                    <button
+                      onClick={() => handleToggleIAMonitor(telefono)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '15px',
+                        border: 'none',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        backgroundColor: iaApagada ? '#fee2e2' : '#dcf8c6',
+                        color: iaApagada ? '#ef4444' : '#00a884',
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                    >
+                      {iaApagada ? 'Humano al Mando (Reactivar IA)' : 'IA Activa (Pausar)'}
+                    </button>
+                  </div>
+
+                  <div className="monitor-input-area" style={{ display: 'flex', gap: '8px', padding: '10px', backgroundColor: '#f0f2f5', borderTop: '1px solid #ddd', flexShrink: 0 }}>
+                    <input
+                      type="text"
+                      placeholder="Escribe un mensaje..."
+                      value={mensajesRapidos[telefono] || ""}
+                      onChange={(e) => setMensajesRapidos(p => ({ ...p, [telefono]: e.target.value }))}
+                      style={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: '1px solid #ccc', outline: 'none' }}
+                    />
+                    <button
+                      className="mend-button"
+                      onClick={() => enviarMensajeMonitor(telefono)}
+                      style={{ padding: '0 20px', borderRadius: '20px', fontWeight: 'bold' }}
+                    >
+                      ➤
+                    </button>
                   </div>
                 </div>
               );
@@ -192,14 +299,35 @@ useEffect(() => {
             <div className="chat-container">
               {historialChat.map((msg, i) => (
                 <div key={i} className={`burbuja ${msg.remitente === 'bot' ? 'bot' : 'cliente'}`}>
-                  <span>{msg.mensaje}</span>
+                  {renderizarMensaje(msg.mensaje)}
                 </div>
               ))}
               <div ref={chatEndRef} />
             </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', marginTop: '4px' }}>
+              <button
+                onClick={handleToggleIA}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  border: 'none',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  backgroundColor: iaSilenciada ? '#fee2e2' : '#dcf8c6',
+                  color: iaSilenciada ? '#ef4444' : '#00a884',
+                  transition: 'all 0.2s ease-in-out',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                }}
+              >
+                {iaSilenciada ? 'Humano al Mando (Reactivar IA)' : 'IA Activa (Pausar)'}
+              </button>
+            </div>
+
             <form onSubmit={enviarMensajeIndividual} style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <input type="text" style={{ flex: 1 }} value={mensajeManual} onChange={(e) => setMensajeManual(e.target.value)} />
-              <button className="mend-button" type="submit">➤</button>
+              <input type="text" style={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: '1px solid #ccc', outline: 'none' }} value={mensajeManual} onChange={(e) => setMensajeManual(e.target.value)} />
+              <button className="mend-button" type="submit" style={{ padding: '0 20px', borderRadius: '20px' }}>Enviar</button>
             </form>
             <button className="secondary-button" style={{ marginTop: '10px' }} onClick={cerrarChat}>Volver</button>
           </div>
