@@ -20,6 +20,7 @@ export default function WhatsAppDashboard() {
     cargarMetricas();
   }, []);
 
+
   const cargarClientes = () => {
     axios.get('http://localhost:3000/api/clientes')
       .then(res => setClientes(res.data))
@@ -115,17 +116,20 @@ useEffect(() => {
         <p className="subtitle">Gestión automatizada por WhatsApp</p>
       </header>
 
-      {/* METRICAS SIEMPRE VISIBLES */}
-      <section style={{ display: 'flex', gap: '15px', marginBottom: '20px', marginTop: '20px' }}>
-        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
-          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
-          <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
-        </div>
-        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
-          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
-          <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
-        </div>
-      </section>
+           <section style={{ display: 'flex', gap: '15px', marginBottom: '20px', marginTop: '20px' }}>
+             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
+               <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
+               <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
+             </div>
+             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
+               <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
+               <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
+             </div>
+             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #FF9F43' }}>
+               <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Chats Activos (Bot)</h4>
+               <h2 style={{ margin: 0 }}>{metricas.activos} <span style={{fontSize: '1rem', color: '#667781'}}>/ 10</span></h2>
+             </div>
+           </section>
 
       <section className="input-section">
         {!clienteActivo && !modoMonitor && (
