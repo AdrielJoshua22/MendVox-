@@ -281,7 +281,15 @@ export default function WhatsAppDashboard() {
                     <button
                       className="mend-button"
                       onClick={() => enviarMensajeMonitor(telefono)}
-                      style={{ padding: '0 20px', borderRadius: '20px', fontWeight: 'bold' }}
+                      style={{
+                        padding: '0 15px',
+                        borderRadius: '20px',
+                        fontWeight: 'bold',
+                        minWidth: '45px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
                     >
                       ➤
                     </button>
