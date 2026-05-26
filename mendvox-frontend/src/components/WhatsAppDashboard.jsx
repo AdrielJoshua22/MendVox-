@@ -100,19 +100,44 @@ export default function WhatsAppDashboard() {
     setSeleccionados(prev => prev.includes(telefono) ? prev.filter(t => t !== telefono) : [...prev, telefono]);
   };
 
+  const toggleSeleccionarTodos = () => {
+    if (seleccionados.length === clientes.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(clientes.map(c => c.telefono));
+    }
+  };
+
   const dispararMensajes = async () => {
     setDisparando(true);
-    const id = toast.loading("Enviando...");
+    const id = toast.loading("Enviando mensajes...");
     try {
       await axios.post('http://localhost:3000/api/campana/disparar', { telefonos: seleccionados });
-      toast.success("Enviado", { id });
+      toast.success("Campana enviada", { id });
       setSeleccionados([]);
       cargarClientes();
       cargarMetricas();
     } catch (e) {
-      toast.error("Error", { id });
+      toast.error("Error al disparar campana", { id });
     }
     setDisparando(false);
+  };
+
+  const eliminarCampana = async () => {
+    const confirmacion = window.confirm("¿Estas seguro de que queres borrar TODA la campana? Se eliminaran todos los clientes y el historial.");
+    if (!confirmacion) return;
+
+    const id = toast.loading("Eliminando campana...");
+    try {
+      await axios.delete('http://localhost:3000/api/campana/borrar');
+      toast.success("Campana eliminada", { id });
+      setSeleccionados([]);
+      cargarClientes();
+      cargarMetricas();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al eliminar", { id });
+    }
   };
 
   const enviarMensajeIndividual = async (e) => {
@@ -125,7 +150,7 @@ export default function WhatsAppDashboard() {
       setHistorialChat(prev => [...prev, { remitente: 'bot', mensaje: texto, fecha: new Date() }]);
       setIaSilenciada(true);
     } catch (e) {
-      toast.error("Error");
+      toast.error("Error al enviar");
       setMensajeManual(texto);
     }
   };
@@ -138,7 +163,7 @@ export default function WhatsAppDashboard() {
       setMensajesRapidos(prev => ({ ...prev, [telefono]: "" }));
       setEstadosIA(prev => ({ ...prev, [telefono]: true }));
     } catch (e) {
-      toast.error("Error");
+      toast.error("Error al enviar");
     }
   };
 
@@ -202,31 +227,73 @@ export default function WhatsAppDashboard() {
       <section className="input-section">
         {!clienteActivo && !modoMonitor && (
           <div className="animate-fade-in">
+
             {seleccionados.length > 0 && (
               <div style={{ backgroundColor: '#e8f5e9', padding: '15px', borderRadius: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 'bold' }}>{seleccionados.length} seleccionados</span>
+                <span style={{ fontWeight: 'bold', color: '#2e7d32' }}>{seleccionados.length} clientes seleccionados</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button className="mend-button" onClick={() => setModoMonitor(true)} disabled={seleccionados.length > 5}>Monitor</button>
-                  <button className="mend-button" onClick={dispararMensajes} disabled={disparando}>Disparar</button>
+                  <button className="mend-button" onClick={dispararMensajes} disabled={disparando}>Disparar Mensajes</button>
                 </div>
               </div>
             )}
 
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th></th><th>Nombre</th><th>Telefono</th><th>Deuda</th></tr></thead>
-              <tbody>
-                {clientes.map(c => (
-                  <tr key={c.telefono} className={`fila-clickeable ${c.estado_campana === 'alerta' ? 'fila-alerta' : ''}`} onClick={() => abrirChat(c)}>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={seleccionados.includes(c.telefono)} onChange={() => toggleSeleccion(c.telefono)} />
-                    </td>
-                    <td>{c.nombre}</td>
-                    <td>{c.telefono}</td>
-                    <td>${c.deuda}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {clientes.length > 0 && (
+              <>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+                      <th style={{ padding: '10px' }}>
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.length === clientes.length && clientes.length > 0}
+                          onChange={toggleSeleccionarTodos}
+                        />
+                      </th>
+                      <th style={{ padding: '10px' }}>Nombre</th>
+                      <th style={{ padding: '10px' }}>Telefono</th>
+                      <th style={{ padding: '10px' }}>Deuda</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientes.map(c => (
+                      <tr key={c.telefono} className={`fila-clickeable ${c.estado_campana === 'alerta' ? 'fila-alerta' : ''}`} onClick={() => abrirChat(c)} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}>
+                        <td style={{ padding: '10px' }} onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={seleccionados.includes(c.telefono)} onChange={() => toggleSeleccion(c.telefono)} />
+                        </td>
+                        <td style={{ padding: '10px' }}>{c.nombre}</td>
+                        <td style={{ padding: '10px' }}>{c.telefono}</td>
+                        <td style={{ padding: '10px' }}>${c.deuda}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <button
+                    onClick={eliminarCampana}
+                    style={{
+                      backgroundColor: '#fee2e2',
+                      color: '#ef4444',
+                      border: '1px solid #ef4444',
+                      padding: '8px 16px',
+                      borderRadius: '20px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    Eliminar Campaña
+                  </button>
+                </div>
+              </>
+            )}
+
+            {clientes.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#667781' }}>
+                <p>No hay clientes en la campaña actual.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -291,7 +358,7 @@ export default function WhatsAppDashboard() {
                         justifyContent: 'center'
                       }}
                     >
-                      ➤
+                      Enviar
                     </button>
                   </div>
                 </div>
