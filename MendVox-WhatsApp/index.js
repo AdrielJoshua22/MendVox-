@@ -78,7 +78,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     if (!chatIA) {
         chatIA = aiModel.startChat({
             history: [
-                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}, Servicio: ${cliente.servicio}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA VITAL: Si el cliente te insulta, se enoja mucho, pide explicitamente hablar con una persona real, o propone un plan de pago que no podes resolver, agrega EXACTAMENTE la palabra [ALERTA_HUMANA] al final de tu respuesta.` }] },
+                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA 1: Si te insulta, pide hablar con un humano o propone algo imposible, agrega [ALERTA_HUMANA] al final. REGLA 2: Al final de TU respuesta, clasifica la actitud del cliente agregando EXACTAMENTE una de estas etiquetas: [SENTIMIENTO: BUENO], [SENTIMIENTO: MALO], [SENTIMIENTO: AGRESIVO] o [SENTIMIENTO: NORMAL].` }] }
                 { role: "model", parts: [{ text: "Dale, arranco." }] }
             ]
         });
@@ -88,6 +88,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     const aiResult = await chatIA.sendMessage(userInput);
     let textoFinal = aiResult.response.text();
     let requiereIntervencion = false;
+    let sentimiento = "NEUTRAL";
 
     if (textoFinal.includes('[ALERTA_HUMANA]')) {
         requiereIntervencion = true;
@@ -95,8 +96,14 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
         humanosAlMando.add(jid);
     }
 
+    const matchSentimiento = textoFinal.match(/\[SENTIMIENTO:\s*(BUENO|MALO|AGRESIVO|NORMAL)\]/i);
+    if (matchSentimiento) {
+        sentimiento = matchSentimiento[1].toUpperCase();
+        textoFinal = textoFinal.replace(matchSentimiento[0], '').trim();
+    }
+
     mensajesGeneradosPorIA.add(textoFinal);
-    console.log(`[Gemini] a ${cliente.nombre}: ${textoFinal}`);
+    console.log(`[Gemini] a ${cliente.nombre} | Sentimiento: ${sentimiento} -> ${textoFinal}`);
 
     if (estadoActual === 'TEXTO') {
         await sock.sendMessage(jid, { text: textoFinal });
@@ -110,8 +117,10 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'bot', ?)", [cliente.telefono, textoFinal]);
 
     if (requiereIntervencion) {
-        await pool.query("UPDATE clientes SET estado_campana = 'alerta' WHERE telefono = ?", [cliente.telefono]);
+        await pool.query("UPDATE clientes SET estado_campana = 'alerta', sentimiento = ? WHERE telefono = ?", [sentimiento, cliente.telefono]);
         console.log(`ALERTA: Intervencion humana requerida para ${cliente.nombre}`);
+    } else {
+        await pool.query("UPDATE clientes SET sentimiento = ? WHERE telefono = ?", [sentimiento, cliente.telefono]);
     }
 }
 
@@ -141,6 +150,13 @@ app.get('/api/metricas', async (req, res) => {
 app.get('/api/chats/:telefono/estado-ia', (req, res) => {
     const jid = `${req.params.telefono}@s.whatsapp.net`;
     res.json({ iaSilenciada: humanosAlMando.has(jid) });
+});
+
+app.get('/api/metricas/sentimientos', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT sentimiento, COUNT(*) as cantidad FROM clientes GROUP BY sentimiento");
+        res.json(rows);
+    } catch (error) { res.status(500).json({ error: "Error interno" }); }
 });
 
 app.post('/api/chats/:telefono/toggle-ia', async (req, res) => {
