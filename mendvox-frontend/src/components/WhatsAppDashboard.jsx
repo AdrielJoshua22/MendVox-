@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function WhatsAppDashboard() {
   const [clientes, setClientes] = useState([]);
@@ -9,6 +10,7 @@ export default function WhatsAppDashboard() {
   const [seleccionados, setSeleccionados] = useState([]);
   const [disparando, setDisparando] = useState(false);
   const [metricas, setMetricas] = useState({ totalDeuda: 0, contactados: 0, activos: 0 });
+  const [datosSentimiento, setDatosSentimiento] = useState([]);
   const [mensajeManual, setMensajeManual] = useState("");
   const [modoMonitor, setModoMonitor] = useState(false);
   const [chatsMultiples, setChatsMultiples] = useState({});
@@ -17,9 +19,16 @@ export default function WhatsAppDashboard() {
   const [estadosIA, setEstadosIA] = useState({});
   const chatEndRef = useRef(null);
 
+  const COLORES_SENTIMIENTO = {
+    POSITIVO: '#25D366',
+    NEGATIVO: '#ef4444',
+    NEUTRAL: '#667781'
+  };
+
   useEffect(() => {
     cargarClientes();
     cargarMetricas();
+    cargarSentimientos();
   }, []);
 
   const cargarClientes = () => {
@@ -31,6 +40,18 @@ export default function WhatsAppDashboard() {
   const cargarMetricas = () => {
     axios.get('http://localhost:3000/api/metricas')
       .then(res => setMetricas(res.data))
+      .catch(err => console.error(err));
+  };
+
+  const cargarSentimientos = () => {
+    axios.get('http://localhost:3000/api/metricas/sentimientos')
+      .then(res => {
+        const datosFormateados = res.data.map(item => ({
+          name: item.sentimiento,
+          value: item.cantidad
+        }));
+        setDatosSentimiento(datosFormateados);
+      })
       .catch(err => console.error(err));
   };
 
@@ -66,6 +87,7 @@ export default function WhatsAppDashboard() {
           setEstadosIA(nuevosEstados);
 
           cargarClientes();
+          cargarSentimientos(); // Refrescamos el grafico en tiempo real
         } catch (e) {
           console.error(e);
         }
@@ -134,6 +156,7 @@ export default function WhatsAppDashboard() {
       setSeleccionados([]);
       cargarClientes();
       cargarMetricas();
+      setDatosSentimiento([]); // Limpiamos el grafico
     } catch (error) {
       console.error(error);
       toast.error("Error al eliminar", { id });
@@ -209,18 +232,45 @@ export default function WhatsAppDashboard() {
         <p className="subtitle">Gestion automatizada por WhatsApp</p>
       </header>
 
-      <section style={{ display: 'flex', gap: '15px', marginBottom: '20px', marginTop: '20px' }}>
-        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
-          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
-          <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
+      {/* DASHBOARD PRINCIPAL CON GRAFICO */}
+      <section style={{ display: 'flex', gap: '20px', marginBottom: '20px', marginTop: '20px', alignItems: 'stretch' }}>
+
+        {/* Metricas Numericas */}
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ display: 'flex', gap: '15px', flex: 1 }}>
+            <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
+              <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Deuda Total</h4>
+              <h2 style={{ margin: 0 }}>${metricas.totalDeuda.toLocaleString('es-AR')}</h2>
+            </div>
+            <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
+              <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
+              <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
+            </div>
+          </div>
+          <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #FF9F43', flex: 1 }}>
+            <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Chats Activos (Bot)</h4>
+            <h2 style={{ margin: 0 }}>{metricas.activos} <span style={{fontSize: '1rem', color: '#667781'}}>/ 10</span></h2>
+          </div>
         </div>
-        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #34B7F1' }}>
-          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Contactados</h4>
-          <h2 style={{ margin: 0 }}>{metricas.contactados}</h2>
-        </div>
-        <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #FF9F43' }}>
-          <h4 style={{ margin: 0, color: '#667781', fontSize: '0.9rem' }}>Chats Activos (Bot)</h4>
-          <h2 style={{ margin: 0 }}>{metricas.activos} <span style={{fontSize: '1rem', color: '#667781'}}>/ 10</span></h2>
+
+        {/* Grafico de Sentimiento */}
+        <div style={{ flex: 1, backgroundColor: '#f8f9fa', borderRadius: '12px', padding: '10px', minWidth: '250px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h4 style={{ margin: '5px 0 0 0', color: '#667781', fontSize: '0.9rem' }}>Humor de Clientes</h4>
+          {datosSentimiento.length > 0 ? (
+            <ResponsiveContainer width="100%" height={160}>
+              <PieChart>
+                <Pie data={datosSentimiento} innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value">
+                  {datosSentimiento.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORES_SENTIMIENTO[entry.name] || '#999'} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }}/>
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', color: '#aaa', fontSize: '0.85rem' }}>Sin datos aún</div>
+          )}
         </div>
       </section>
 
@@ -253,6 +303,7 @@ export default function WhatsAppDashboard() {
                       <th style={{ padding: '10px' }}>Nombre</th>
                       <th style={{ padding: '10px' }}>Telefono</th>
                       <th style={{ padding: '10px' }}>Deuda</th>
+                      <th style={{ padding: '10px' }}>Humor</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -264,6 +315,11 @@ export default function WhatsAppDashboard() {
                         <td style={{ padding: '10px' }}>{c.nombre}</td>
                         <td style={{ padding: '10px' }}>{c.telefono}</td>
                         <td style={{ padding: '10px' }}>${c.deuda}</td>
+                        <td style={{ padding: '10px', fontWeight: 'bold', color: COLORES_SENTIMIENTO[c.sentimiento] || '#667781' }}>
+                          {c.sentimiento === 'POSITIVO' && '😊'}
+                          {c.sentimiento === 'NEGATIVO' && '😡'}
+                          {c.sentimiento === 'NEUTRAL' && '😐'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
