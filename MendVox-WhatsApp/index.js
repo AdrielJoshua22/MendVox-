@@ -78,7 +78,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     if (!chatIA) {
         chatIA = aiModel.startChat({
             history: [
-                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA 1: Si te insulta, pide hablar con un humano o propone algo imposible, agrega [ALERTA_HUMANA] al final. REGLA 2: Al final de TU respuesta, clasifica la actitud del cliente agregando EXACTAMENTE una de estas etiquetas: [SENTIMIENTO: BUENO], [SENTIMIENTO: MALO], [SENTIMIENTO: AGRESIVO] o [SENTIMIENTO: NORMAL].` }] }
+                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA 1: Si te insulta, pide hablar con un humano o propone algo imposible, agrega [ALERTA_HUMANA] al final. REGLA 2: Al final de TU respuesta, clasifica la actitud del cliente agregando EXACTAMENTE una de estas etiquetas: [SENTIMIENTO: BUENO], [SENTIMIENTO: MALO], [SENTIMIENTO: AGRESIVO] o [SENTIMIENTO: NORMAL].` }] },
                 { role: "model", parts: [{ text: "Dale, arranco." }] }
             ]
         });
@@ -88,7 +88,7 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     const aiResult = await chatIA.sendMessage(userInput);
     let textoFinal = aiResult.response.text();
     let requiereIntervencion = false;
-    let sentimiento = "NEUTRAL";
+    let sentimiento = "NORMAL";
 
     if (textoFinal.includes('[ALERTA_HUMANA]')) {
         requiereIntervencion = true;
@@ -335,12 +335,13 @@ async function connectToWhatsApp() {
            const esInsulto = palabrasAgresivas.some(palabra => userInput.toLowerCase().includes(palabra));
 
            if (esInsulto) {
-               console.log(`ALERTA ROJA Lenguaje agresivo detectado de ${cliente.nombre}`);
-               humanosAlMando.add(jidOficial);
-               await pool.query("UPDATE clientes SET estado_campana = 'alerta', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
-           } else {
-               await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
-           }
+                          console.log(`ALERTA ROJA Lenguaje agresivo detectado de ${cliente.nombre}`);
+                          humanosAlMando.add(jidOficial);
+                          // ACÁ ESTÁ EL CAMBIO: Le agregamos sentimiento = 'AGRESIVO'
+                          await pool.query("UPDATE clientes SET estado_campana = 'alerta', sentimiento = 'AGRESIVO', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
+                      } else {
+                          await pool.query("UPDATE clientes SET estado_campana = 'activa', ultima_interaccion = NOW() WHERE telefono = ?", [numeroOficial]);
+                      }
 
            await pool.query("INSERT INTO historial_chats (telefono_cliente, remitente, mensaje) VALUES (?, 'cliente', ?)", [numeroOficial, mensajeParaBD]);
 
