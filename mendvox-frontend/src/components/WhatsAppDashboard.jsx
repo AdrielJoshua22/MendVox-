@@ -20,8 +20,10 @@ export default function WhatsAppDashboard() {
   const chatEndRef = useRef(null);
 
   const COLORES_SENTIMIENTO = {
-    POSITIVO: '#25D366',
-    NEGATIVO: '#ef4444',
+    BUENO: '#25D366',
+    MALO: '#FF9F43',
+    AGRESIVO: '#ef4444',
+    NORMAL: '#667781',
     NEUTRAL: '#667781'
   };
 
@@ -87,7 +89,7 @@ export default function WhatsAppDashboard() {
           setEstadosIA(nuevosEstados);
 
           cargarClientes();
-          cargarSentimientos(); // Refrescamos el grafico en tiempo real
+          cargarSentimientos();
         } catch (e) {
           console.error(e);
         }
@@ -156,7 +158,7 @@ export default function WhatsAppDashboard() {
       setSeleccionados([]);
       cargarClientes();
       cargarMetricas();
-      setDatosSentimiento([]); // Limpiamos el grafico
+      setDatosSentimiento([]);
     } catch (error) {
       console.error(error);
       toast.error("Error al eliminar", { id });
@@ -232,10 +234,8 @@ export default function WhatsAppDashboard() {
         <p className="subtitle">Gestion automatizada por WhatsApp</p>
       </header>
 
-      {/* DASHBOARD PRINCIPAL CON GRAFICO */}
       <section style={{ display: 'flex', gap: '20px', marginBottom: '20px', marginTop: '20px', alignItems: 'stretch' }}>
 
-        {/* Metricas Numericas */}
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div style={{ display: 'flex', gap: '15px', flex: 1 }}>
             <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #25D366' }}>
@@ -253,7 +253,6 @@ export default function WhatsAppDashboard() {
           </div>
         </div>
 
-        {/* Grafico de Sentimiento */}
         <div style={{ flex: 1, backgroundColor: '#f8f9fa', borderRadius: '12px', padding: '10px', minWidth: '250px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <h4 style={{ margin: '5px 0 0 0', color: '#667781', fontSize: '0.9rem' }}>Humor de Clientes</h4>
           {datosSentimiento.length > 0 ? (
@@ -269,7 +268,7 @@ export default function WhatsAppDashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', color: '#aaa', fontSize: '0.85rem' }}>Sin datos aún</div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', color: '#aaa', fontSize: '0.85rem' }}>Sin datos aun</div>
           )}
         </div>
       </section>
@@ -316,9 +315,11 @@ export default function WhatsAppDashboard() {
                         <td style={{ padding: '10px' }}>{c.telefono}</td>
                         <td style={{ padding: '10px' }}>${c.deuda}</td>
                         <td style={{ padding: '10px', fontWeight: 'bold', color: COLORES_SENTIMIENTO[c.sentimiento] || '#667781' }}>
-                          {c.sentimiento === 'POSITIVO' && '😊'}
-                          {c.sentimiento === 'NEGATIVO' && '😡'}
-                          {c.sentimiento === 'NEUTRAL' && '😐'}
+                          {c.sentimiento === 'BUENO' && 'Bueno'}
+                          {c.sentimiento === 'MALO' && 'Malo'}
+                          {c.sentimiento === 'AGRESIVO' && 'Agresivo'}
+                          {c.sentimiento === 'NORMAL' && 'Normal'}
+                          {c.sentimiento === 'NEUTRAL' && 'Normal'}
                         </td>
                       </tr>
                     ))}
@@ -339,7 +340,7 @@ export default function WhatsAppDashboard() {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                     }}
                   >
-                    Eliminar Campaña
+                    Eliminar Campana
                   </button>
                 </div>
               </>
@@ -347,7 +348,7 @@ export default function WhatsAppDashboard() {
 
             {clientes.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px', color: '#667781' }}>
-                <p>No hay clientes en la campaña actual.</p>
+                <p>No hay clientes en la campana actual.</p>
               </div>
             )}
           </div>
