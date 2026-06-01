@@ -6,24 +6,25 @@ import AudioMender from './components/AudioMender';
 import WhatsAppDashboard from './components/WhatsAppDashboard';
 import GestorCampana from './components/GestorCampana';
 import './App.css';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [vistaActiva, setVistaActiva] = useState('menu'); // 'menu', 'audio', 'whatsapp', 'campana'
-  const [theme, setTheme] = useState('light'); // 'light' o 'dark'
+  const [vistaActiva, setVistaActiva] = useState('menu');
+  const [theme, setTheme] = useState('light');
 
-  // Sincronizamos la clase del body con el tema seleccionado
+
   useEffect(() => {
     document.body.className = theme === 'dark' ? 'dark-theme' : 'light-theme';
   }, [theme]);
 
-  // Definimos el color de acento dinámico según la sección activa
   const obtenerColorAcento = () => {
     switch (vistaActiva) {
-      case 'audio': return '#34B7F1';    // Cian corporativo
-      case 'whatsapp': return '#00a884'; // Verde WhatsApp
-      case 'campana': return '#f57c00';  // Naranja Excel
-      default: return '#00a884';         // Por defecto verde
+      case 'audio': return '#34B7F1';
+      case 'whatsapp': return '#00a884';
+      case 'campana': return '#f57c00';
+      case 'metricas': return '#a855f7';
+      default: return '#00a884';
     }
   };
 
@@ -75,6 +76,7 @@ if (!isLoggedIn) {
         {vistaActiva === 'audio' && <AudioMender />}
         {vistaActiva === 'whatsapp' && <WhatsAppDashboard />}
         {vistaActiva === 'campana' && <GestorCampana />}
+        {vistaActiva === 'metricas' && <AnalyticsDashboard />}
       </div>
 
       <footer className="main-footer" style={{ marginTop: '50px', padding: '30px 0', width: '100%', textAlign: 'center', borderTop: '1px solid var(--border-light)' }}>

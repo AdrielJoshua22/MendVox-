@@ -25,17 +25,36 @@ export default function MenuPrincipal({ setVista }) {
       icon: 'fa-database',
       color: '#f57c00',
       bg: 'rgba(245, 124, 0, 0.12)'
+    },
+    {
+      id: 'metricas',
+      title: 'Analítica y Métricas',
+      desc: 'Panel de Business Intelligence con gráficos históricos y rendimiento del bot.',
+      icon: 'fa-chart-line',
+      color: '#a855f7',
+      bg: 'rgba(168, 85, 247, 0.12)'
     }
   ];
 
   return (
-    <div className="menu-clean-container animate-fade-in">
+    <div className="menu-clean-container animate-fade-in" style={{ maxWidth: '100%', overflow: 'hidden' }}>
       <div className="menu-header-clean">
         <h2>MendVox Suite</h2>
         <p>Seleccioná el módulo de gestión para comenzar</p>
       </div>
 
-      <div className="grid-clean">
+      {/* CONTENEDOR DEL CARRUSEL */}
+      <div
+        style={{
+          display: 'flex',
+          overflowX: 'auto',
+          gap: '25px',
+          padding: '10px 10px 30px 10px', /* Padding inferior extra para la barra de scroll */
+          scrollSnapType: 'x mandatory', /* Efecto magnético del carrusel */
+          scrollBehavior: 'smooth',
+          WebkitOverflowScrolling: 'touch' /* Scrolleo suave en celulares */
+        }}
+      >
         {cards.map(card => (
           <div
             key={card.id}
@@ -46,7 +65,10 @@ export default function MenuPrincipal({ setVista }) {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              textAlign: 'center'
+              textAlign: 'center',
+              flex: '0 0 300px', /* EL TRUCO: Fuerza a que midan 300px y no se encojan */
+              scrollSnapAlign: 'start', /* Hace que el scroll frene al inicio de la tarjeta */
+              cursor: 'pointer'
             }}
           >
             <div
@@ -54,13 +76,13 @@ export default function MenuPrincipal({ setVista }) {
               style={{
                 backgroundColor: card.bg,
                 color: card.color,
-                width: '75px',  /* Antes 60px */
-                height: '75px', /* Antes 60px */
+                width: '75px',
+                height: '75px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2rem', /* Antes 1.6rem (Icono interno más grande) */
+                fontSize: '2rem',
                 marginBottom: '25px'
               }}
             >
