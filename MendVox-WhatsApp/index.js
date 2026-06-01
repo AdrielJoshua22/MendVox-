@@ -159,6 +159,26 @@ app.get('/api/metricas/sentimientos', async (req, res) => {
     } catch (error) { res.status(500).json({ error: "Error interno" }); }
 });
 
+app.get('/api/metricas/historico', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                DATE_FORMAT(fecha, '%d/%m') as dia,
+                COUNT(DISTINCT telefono_cliente) as conversaciones,
+                COUNT(mensaje) as total_mensajes
+            FROM historial_chats
+            GROUP BY DATE_FORMAT(fecha, '%d/%m')
+            ORDER BY MIN(fecha) ASC
+            LIMIT 7
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error interno" });
+    }
+});
+
 app.post('/api/chats/:telefono/toggle-ia', async (req, res) => {
     try {
         const telefono = req.params.telefono;
