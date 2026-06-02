@@ -75,15 +75,15 @@ async function procesarRespuestaIA(jid, userInput, cliente, msg) {
     const estadoActual = preferenciasChat.get(jid);
     let chatIA = sesionesIA.get(jid);
 
-    if (!chatIA) {
-        chatIA = aiModel.startChat({
-            history: [
-                { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA 1: Si te insulta, pide hablar con un humano o propone algo imposible, agrega [ALERTA_HUMANA] al final. REGLA 2: Al final de TU respuesta, clasifica la actitud del cliente agregando EXACTAMENTE una de estas etiquetas: [SENTIMIENTO: BUENO], [SENTIMIENTO: MALO], [SENTIMIENTO: AGRESIVO] o [SENTIMIENTO: NORMAL].` }] },
-                { role: "model", parts: [{ text: "Dale, arranco." }] }
-            ]
-        });
-        sesionesIA.set(jid, chatIA);
-    }
+   if (!chatIA) {
+           chatIA = aiModel.startChat({
+               history: [
+                   { role: "user", parts: [{ text: `Sos Joshua, del area de cobranzas de MendVox. Estas hablando con ${cliente.nombre}. DATOS: Deuda $${cliente.deuda}. NUNCA digas que sos un bot. Habla argentino informal pero laboral. REGLA 1: Si te insulta, pide hablar con un humano o propone algo imposible, agrega [ALERTA_HUMANA] al final. REGLA 2: Al final de TU respuesta, clasifica la actitud del cliente agregando EXACTAMENTE una de estas etiquetas: [SENTIMIENTO: BUENO], [SENTIMIENTO: MALO], [SENTIMIENTO: AGRESIVO] o [SENTIMIENTO: NORMAL]. REGLA 3: Tus respuestas deben ser EXTREMADAMENTE CORTAS y concisas, típicas de un chat de WhatsApp. NUNCA escribas párrafos largos ni des explicaciones innecesarias. Máximo 2 o 3 oraciones breves. Andá directo al grano.` }] },
+                   { role: "model", parts: [{ text: "Dale, arranco. Seré breve y directo." }] }
+               ]
+           });
+           sesionesIA.set(jid, chatIA);
+       }
 
     const aiResult = await chatIA.sendMessage(userInput);
     let textoFinal = aiResult.response.text();
